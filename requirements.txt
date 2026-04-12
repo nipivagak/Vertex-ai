@@ -1,0 +1,2 @@
+kfp>=2,<3
+google-cloud-aiplatform>=1.144.0

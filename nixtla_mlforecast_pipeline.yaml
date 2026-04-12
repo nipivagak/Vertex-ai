@@ -1,0 +1,231 @@
+# PIPELINE DEFINITION
+# Name: nixtla-mlforecast-pipeline
+# Description: Train and evaluate a Nixtla MLForecast model on Vertex AI Pipelines
+# Inputs:
+#    bq_table: str
+#    date_features: list [Default: ['dayofweek', 'month']]
+#    forecast_freq: str [Default: 'D']
+#    horizon: int [Default: 2.0]
+#    lags: list [Default: [1.0, 2.0, 3.0]]
+#    model_display_name: str [Default: 'mlforecast-lgbm']
+#    prediction_bq_table: str
+#    project_id: str
+components:
+  comp-train-mlforecast-component:
+    executorLabel: exec-train-mlforecast-component
+    inputDefinitions:
+      parameters:
+        bq_table:
+          parameterType: STRING
+        date_features:
+          parameterType: LIST
+        forecast_freq:
+          parameterType: STRING
+        horizon:
+          parameterType: NUMBER_INTEGER
+        lags:
+          parameterType: LIST
+        model_display_name:
+          parameterType: STRING
+        prediction_bq_table:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        eval_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        eval_predictions:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        model_artifact:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-train-mlforecast-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_mlforecast_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'numpy>=1.26.0' 'scikit-learn>=1.4.0' 'lightgbm>=4.3.0' 'mlforecast>=0.13.0'\
+          \ 'google-cloud-bigquery>=3.25.0' 'google-cloud-storage>=2.18.0' 'pyarrow>=17.0.0'\
+          \ 'db-dtypes>=1.2.0'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.16.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_mlforecast_component(\n    project_id: str,\n    bq_table:\
+          \ str,\n    prediction_bq_table: str,\n    forecast_freq: str,\n    horizon:\
+          \ int,\n    lags: list[int],\n    date_features: list[str],\n    model_display_name:\
+          \ str,\n    model_artifact: Output[Model],\n    eval_metrics: Output[Metrics],\n\
+          \    eval_predictions: Output[Artifact],\n) -> None:\n    import json\n\
+          \    from pathlib import Path\n\n    import numpy as np\n    import pandas\
+          \ as pd\n    from google.cloud import bigquery\n    from lightgbm import\
+          \ LGBMRegressor\n    from mlforecast import MLForecast\n    from sklearn.ensemble\
+          \ import RandomForestRegressor, ExtraTreesRegressor\n\n    def wmape(y_true:\
+          \ np.ndarray, y_pred: np.ndarray) -> float:\n        denom = np.abs(y_true).sum()\n\
+          \        if denom == 0:\n            return float(\"nan\")\n        return\
+          \ float(np.abs(y_true - y_pred).sum() / denom)\n\n    client = bigquery.Client(project=project_id)\n\
+          \    query = f\"\"\"\n        SELECT *\n        FROM `{bq_table}`\n    \
+          \    WHERE unique_id IS NOT NULL\n          AND ds IS NOT NULL\n       \
+          \   AND y IS NOT NULL\n        ORDER BY unique_id, ds\n    \"\"\"\n    df\
+          \ = client.query(query).to_dataframe()\n\n    if df.empty:\n        raise\
+          \ ValueError(\"No rows returned from BigQuery.\")\n\n    required_cols =\
+          \ {\"unique_id\", \"ds\", \"y\"}\n    missing = required_cols - set(df.columns)\n\
+          \    if missing:\n        raise ValueError(f\"Missing required columns:\
+          \ {sorted(missing)}\")\n\n    df[\"unique_id\"] = df[\"unique_id\"].astype(str)\n\
+          \    df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n    df[\"y\"] = pd.to_numeric(df[\"\
+          y\"], errors=\"coerce\")\n    df = df.dropna(subset=[\"unique_id\", \"ds\"\
+          , \"y\"]).sort_values([\"unique_id\", \"ds\"])\n\n    counts = df.groupby(\"\
+          unique_id\").size()\n    df = df[df[\"unique_id\"].isin(counts[counts >\
+          \ horizon].index)]\n\n    if df.empty:\n        raise ValueError(\"No series\
+          \ left after filtering short series.\")\n\n    train_parts = []\n    valid_parts\
+          \ = []\n\n    for _, g in df.groupby(\"unique_id\", sort=False):\n     \
+          \   train_parts.append(g.iloc[:-horizon])\n        valid_parts.append(g.iloc[-horizon:])\n\
+          \n    train_df = pd.concat(train_parts, ignore_index=True)\n    valid_df\
+          \ = pd.concat(valid_parts, ignore_index=True)\n\n    models = {\n      \
+          \  \"lgbm\": LGBMRegressor(\n            n_estimators=300,\n           \
+          \ learning_rate=0.05,\n            num_leaves=64,\n            subsample=0.9,\n\
+          \            colsample_bytree=0.9,\n            random_state=42,\n     \
+          \       verbosity=-1,\n        ),\n        \"rf\": RandomForestRegressor(\n\
+          \            n_estimators=300,\n            max_depth=10,\n            min_samples_leaf=2,\n\
+          \            n_jobs=-1,\n            random_state=42,\n        ),\n    \
+          \    \"et\": ExtraTreesRegressor(\n            n_estimators=300,\n     \
+          \       max_depth=10,\n            min_samples_leaf=2,\n            n_jobs=-1,\n\
+          \            random_state=42,\n        ),\n    }\n\n    allowed_date_features\
+          \ = [\n        \"year\",\n        \"month\",\n        \"week\",\n      \
+          \  \"day\",\n        \"dayofweek\",\n        \"dayofyear\",\n        \"\
+          quarter\",\n    ]\n    parsed_date_features = [x for x in date_features\
+          \ if x in allowed_date_features]\n\n    fcst = MLForecast(\n        models=models,\n\
+          \        freq=forecast_freq,\n        lags=lags,\n        date_features=parsed_date_features,\n\
+          \        num_threads=1,\n    )\n\n    fcst.fit(\n        train_df,\n   \
+          \     id_col=\"unique_id\",\n        time_col=\"ds\",\n        target_col=\"\
+          y\",\n    )\n\n    preds = fcst.predict(h=horizon)\n\n    model_cols = [c\
+          \ for c in preds.columns if c not in [\"unique_id\", \"ds\"]]\n    if not\
+          \ model_cols:\n        raise ValueError(f\"No model prediction columns found.\
+          \ Got columns: {preds.columns.tolist()}\")\n\n    merged = valid_df.merge(\n\
+          \        preds,\n        on=[\"unique_id\", \"ds\"],\n        how=\"inner\"\
+          ,\n    )\n\n    if merged.empty:\n        print(\"Validation sample:\")\n\
+          \        print(valid_df.head())\n        print(\"Prediction sample:\")\n\
+          \        print(preds.head())\n        raise ValueError(\"No overlapping\
+          \ rows between validation set and predictions.\")\n\n    y_true = merged[\"\
+          y\"].to_numpy(dtype=float)\n\n    results = []\n    best_model = None\n\
+          \    best_wmape = float(\"inf\")\n\n    for model_name in model_cols:\n\
+          \        y_pred = merged[model_name].to_numpy(dtype=float)\n        rmse\
+          \ = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))\n        mae = float(np.mean(np.abs(y_true\
+          \ - y_pred)))\n        metric_wmape = wmape(y_true, y_pred)\n\n        results.append({\n\
+          \            \"model\": model_name,\n            \"rmse\": rmse,\n     \
+          \       \"mae\": mae,\n            \"wmape\": metric_wmape,\n        })\n\
+          \n        eval_metrics.log_metric(f\"{model_name}_rmse\", rmse)\n      \
+          \  eval_metrics.log_metric(f\"{model_name}_mae\", mae)\n        eval_metrics.log_metric(f\"\
+          {model_name}_wmape\", metric_wmape)\n\n        if metric_wmape < best_wmape:\n\
+          \            best_wmape = metric_wmape\n            best_model = model_name\n\
+          \n    eval_metrics.log_metric(\"best_wmape\", best_wmape)\n\n    merged[\"\
+          run_ts\"] = pd.Timestamp.utcnow()\n    merged[\"model_display_name\"] =\
+          \ model_display_name\n    merged[\"source_table\"] = bq_table\n    merged[\"\
+          forecast_freq\"] = forecast_freq\n    merged[\"horizon\"] = horizon\n  \
+          \  merged[\"best_model\"] = best_model\n\n    job_config = bigquery.LoadJobConfig(\n\
+          \        write_disposition=\"WRITE_APPEND\"\n    )\n    client.load_table_from_dataframe(\n\
+          \        merged,\n        prediction_bq_table,\n        job_config=job_config,\n\
+          \    ).result()\n\n    pred_path = Path(eval_predictions.path)\n    pred_path.parent.mkdir(parents=True,\
+          \ exist_ok=True)\n    merged.to_csv(pred_path, index=False)\n\n    model_dir\
+          \ = Path(model_artifact.path)\n    model_dir.mkdir(parents=True, exist_ok=True)\n\
+          \    fcst.save(model_dir)\n\n    metadata = {\n        \"model_display_name\"\
+          : model_display_name,\n        \"source_table\": bq_table,\n        \"prediction_bq_table\"\
+          : prediction_bq_table,\n        \"forecast_freq\": forecast_freq,\n    \
+          \    \"horizon\": horizon,\n        \"lags\": lags,\n        \"date_features\"\
+          : parsed_date_features,\n        \"train_rows\": int(len(train_df)),\n \
+          \       \"valid_rows\": int(len(valid_df)),\n        \"series_count\": int(df[\"\
+          unique_id\"].nunique()),\n        \"best_model\": best_model,\n        \"\
+          best_wmape\": best_wmape,\n        \"model_results\": results,\n    }\n\
+          \    with open(model_dir / \"metadata.json\", \"w\", encoding=\"utf-8\"\
+          ) as f:\n        json.dump(metadata, f, indent=2)\n\n"
+        image: python:3.11
+pipelineInfo:
+  description: Train and evaluate a Nixtla MLForecast model on Vertex AI Pipelines
+  name: nixtla-mlforecast-pipeline
+root:
+  dag:
+    tasks:
+      train-mlforecast-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-mlforecast-component
+        inputs:
+          parameters:
+            bq_table:
+              componentInputParameter: bq_table
+            date_features:
+              componentInputParameter: date_features
+            forecast_freq:
+              componentInputParameter: forecast_freq
+            horizon:
+              componentInputParameter: horizon
+            lags:
+              componentInputParameter: lags
+            model_display_name:
+              componentInputParameter: model_display_name
+            prediction_bq_table:
+              componentInputParameter: prediction_bq_table
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: train-mlforecast-component
+  inputDefinitions:
+    parameters:
+      bq_table:
+        parameterType: STRING
+      date_features:
+        defaultValue:
+        - dayofweek
+        - month
+        isOptional: true
+        parameterType: LIST
+      forecast_freq:
+        defaultValue: D
+        isOptional: true
+        parameterType: STRING
+      horizon:
+        defaultValue: 2.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      lags:
+        defaultValue:
+        - 1.0
+        - 2.0
+        - 3.0
+        isOptional: true
+        parameterType: LIST
+      model_display_name:
+        defaultValue: mlforecast-lgbm
+        isOptional: true
+        parameterType: STRING
+      prediction_bq_table:
+        parameterType: STRING
+      project_id:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.16.0
