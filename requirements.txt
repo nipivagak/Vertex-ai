@@ -1,2 +1,16 @@
 kfp>=2,<3
 google-cloud-aiplatform>=1.144.0
+google-cloud-bigquery>=3.25.0
+google-cloud-storage>=2.18.0
+pandas-gbq>=0.28.0
+pandas>=2.2.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+lightgbm>=4.3.0
+xgboost>=2.0.0
+mlforecast>=0.13.0
+statsmodels>=0.14.0
+statsforecast>=1.5.0
+arch>=6.0.0
+pyarrow>=17.0.0
+db-dtypes>=1.2.0

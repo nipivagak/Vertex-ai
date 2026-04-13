@@ -1,0 +1,24 @@
+{
+  "model_type": "xgb",
+  "forecast_freq": "D",
+  "horizon": 2,
+  "lags": [
+    1,
+    2,
+    3
+  ],
+  "date_features": [
+    "dayofweek",
+    "month"
+  ],
+  "train_rows": 3640,
+  "valid_rows": 40,
+  "series_count": 20,
+  "rmse": NaN,
+  "mae": NaN,
+  "wmape": 0.0,
+  "model_uri": "artifacts/local_models/sales-mlforecast-v3-local/xgb/model.pkl",
+  "model_display_name": "sales-mlforecast-v3-local",
+  "source_table": "forecasting.sales_daily",
+  "prediction_bq_table": "forecasting.sales_predictions"
+}

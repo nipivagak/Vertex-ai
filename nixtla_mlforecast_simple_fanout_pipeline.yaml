@@ -1,0 +1,1605 @@
+# PIPELINE DEFINITION
+# Name: nixtla-mlforecast-simple-fanout-pipeline
+# Description: MLForecast fan-out pipeline with 5 static training tasks
+# Inputs:
+#    batch_forecast_bq_table: str [Default: 'forecasting.sales_batch_forecasts']
+#    bq_table: str [Default: 'forecasting.sales_daily']
+#    champion_bq_table: str [Default: 'forecasting.sales_champion']
+#    champion_metric: str [Default: 'wmape']
+#    date_features: list [Default: ['dayofweek', 'month']]
+#    endpoint_display_name: str [Default: 'mlforecast-champion-endpoint']
+#    forecast_freq: str [Default: 'D']
+#    horizon: int [Default: 2.0]
+#    lags: list [Default: [1.0, 2.0, 3.0]]
+#    model_display_name: str [Default: 'mlforecast']
+#    prediction_bq_table: str [Default: 'forecasting.sales_predictions']
+#    project_id: str [Default: 'dazzling-seat-366014']
+#    region: str [Default: 'us-central1']
+components:
+  comp-aggregate-training-results-component:
+    executorLabel: exec-aggregate-training-results-component
+    inputDefinitions:
+      parameters:
+        result1:
+          parameterType: STRING
+        result2:
+          parameterType: STRING
+        result3:
+          parameterType: STRING
+        result4:
+          parameterType: STRING
+        result5:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-batch-forecast-component:
+    executorLabel: exec-batch-forecast-component
+    inputDefinitions:
+      parameters:
+        batch_forecast_bq_table:
+          parameterType: STRING
+        bq_table:
+          parameterType: STRING
+        champion_result:
+          parameterType: STRING
+        date_features:
+          parameterType: LIST
+        forecast_freq:
+          parameterType: STRING
+        horizon:
+          parameterType: NUMBER_INTEGER
+        lags:
+          parameterType: LIST
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-register-and-deploy-champion-component:
+    executorLabel: exec-register-and-deploy-champion-component
+    inputDefinitions:
+      parameters:
+        champion_result:
+          parameterType: STRING
+        endpoint_display_name:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        region:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-select-champion-component:
+    executorLabel: exec-select-champion-component
+    inputDefinitions:
+      parameters:
+        champion_bq_table:
+          parameterType: STRING
+        metric_name:
+          defaultValue: wmape
+          isOptional: true
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        training_results_json:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-train-single-model-component:
+    executorLabel: exec-train-single-model-component
+    inputDefinitions:
+      parameters:
+        bq_table:
+          parameterType: STRING
+        date_features:
+          parameterType: LIST
+        forecast_freq:
+          parameterType: STRING
+        horizon:
+          parameterType: NUMBER_INTEGER
+        lags:
+          parameterType: LIST
+        model_display_name:
+          parameterType: STRING
+        model_type:
+          parameterType: STRING
+        prediction_bq_table:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        eval_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        eval_predictions:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        model_artifact:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-train-single-model-component-2:
+    executorLabel: exec-train-single-model-component-2
+    inputDefinitions:
+      parameters:
+        bq_table:
+          parameterType: STRING
+        date_features:
+          parameterType: LIST
+        forecast_freq:
+          parameterType: STRING
+        horizon:
+          parameterType: NUMBER_INTEGER
+        lags:
+          parameterType: LIST
+        model_display_name:
+          parameterType: STRING
+        model_type:
+          parameterType: STRING
+        prediction_bq_table:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        eval_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        eval_predictions:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        model_artifact:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-train-single-model-component-3:
+    executorLabel: exec-train-single-model-component-3
+    inputDefinitions:
+      parameters:
+        bq_table:
+          parameterType: STRING
+        date_features:
+          parameterType: LIST
+        forecast_freq:
+          parameterType: STRING
+        horizon:
+          parameterType: NUMBER_INTEGER
+        lags:
+          parameterType: LIST
+        model_display_name:
+          parameterType: STRING
+        model_type:
+          parameterType: STRING
+        prediction_bq_table:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        eval_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        eval_predictions:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        model_artifact:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-train-single-model-component-4:
+    executorLabel: exec-train-single-model-component-4
+    inputDefinitions:
+      parameters:
+        bq_table:
+          parameterType: STRING
+        date_features:
+          parameterType: LIST
+        forecast_freq:
+          parameterType: STRING
+        horizon:
+          parameterType: NUMBER_INTEGER
+        lags:
+          parameterType: LIST
+        model_display_name:
+          parameterType: STRING
+        model_type:
+          parameterType: STRING
+        prediction_bq_table:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        eval_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        eval_predictions:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        model_artifact:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-train-single-model-component-5:
+    executorLabel: exec-train-single-model-component-5
+    inputDefinitions:
+      parameters:
+        bq_table:
+          parameterType: STRING
+        date_features:
+          parameterType: LIST
+        forecast_freq:
+          parameterType: STRING
+        horizon:
+          parameterType: NUMBER_INTEGER
+        lags:
+          parameterType: LIST
+        model_display_name:
+          parameterType: STRING
+        model_type:
+          parameterType: STRING
+        prediction_bq_table:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        eval_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        eval_predictions:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        model_artifact:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-aggregate-training-results-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - aggregate_training_results_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef aggregate_training_results_component(\n    result1: str,\n  \
+          \  result2: str,\n    result3: str,\n    result4: str,\n    result5: str,\n\
+          ) -> str:\n    \"\"\"Aggregate training result JSON strings into a JSON\
+          \ list.\"\"\"\n    import json\n    import logging\n\n    logging.basicConfig(\n\
+          \        level=logging.INFO,\n        format=\"%(asctime)s | %(levelname)s\
+          \ | %(name)s | %(message)s\",\n    )\n    logger = logging.getLogger(\"\
+          aggregate_training_results_component\")\n\n    results = []\n    for index,\
+          \ raw_result in enumerate([result1, result2, result3, result4, result5],\
+          \ start=1):\n        result = json.loads(raw_result)\n        results.append(result)\n\
+          \        logger.info(\n            \"Collected result %d for model_type=%s\"\
+          ,\n            index,\n            result.get(\"model_type\", \"unknown\"\
+          ),\n        )\n\n    logger.info(\"Aggregated %d training results\", len(results))\n\
+          \    return json.dumps(results)\n\n"
+        image: python:3.11
+    exec-batch-forecast-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - batch_forecast_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'google-cloud-storage>=2.18.0' 'google-cloud-bigquery>=3.25.0' 'pandas-gbq>=0.28.0'\
+          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef batch_forecast_component(\n    project_id: str,\n    bq_table:\
+          \ str,\n    batch_forecast_bq_table: str,\n    forecast_freq: str,\n   \
+          \ horizon: int,\n    lags: list[int],\n    date_features: list[str],\n \
+          \   champion_result: str,\n) -> str:\n    \"\"\"Generate batch forecasts\
+          \ using the champion model.\"\"\"\n    import json\n    import logging\n\
+          \    import pandas as pd\n    from google.cloud import bigquery, storage\n\
+          \n    logging.basicConfig(\n        level=logging.INFO,\n        format=\"\
+          %(asctime)s | %(levelname)s | %(name)s | %(message)s\",\n    )\n    logger\
+          \ = logging.getLogger(\"batch_forecast_component\")\n\n    champion = json.loads(champion_result)\n\
+          \    champion_model_type = champion[\"champion_model_type\"]\n\n    logger.info(\"\
+          Starting batch forecast with champion_model_type=%s\", champion_model_type)\n\
+          \n    # Load recent data\n    bq_client = bigquery.Client(project=project_id)\n\
+          \    query = f\"\"\"\n    SELECT unique_id, ds, y\n    FROM `{project_id}.{bq_table}`\n\
+          \    ORDER BY ds DESC\n    LIMIT 1000\n    \"\"\"\n    df = bq_client.query(query).to_dataframe()\n\
+          \    df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n    logger.info(\"Loaded %d\
+          \ rows for batch forecasting\", len(df))\n\n    # Generate forecasts\n \
+          \   # For demo, create simple forecasts\n    forecast_data = []\n    run_ts\
+          \ = pd.Timestamp.utcnow()\n    for uid in df[\"unique_id\"].unique():\n\
+          \        last_y = df[df[\"unique_id\"] == uid][\"y\"].iloc[-1]\n       \
+          \ for h in range(1, horizon + 1):\n            forecast_data.append({\n\
+          \                \"unique_id\": uid,\n                \"ds\": pd.Timestamp.now()\
+          \ + pd.Timedelta(days=h),\n                \"prediction\": last_y * (1.0\
+          \ + 0.01 * h),\n                \"run_ts\": run_ts,\n                \"\
+          model_type\": champion_model_type,\n                \"source_table\": bq_table,\n\
+          \                \"forecast_freq\": forecast_freq,\n                \"horizon\"\
+          : horizon,\n                \"is_future\": True,\n            })\n\n   \
+          \ forecast_df = pd.DataFrame(forecast_data)\n    logger.info(\"Generated\
+          \ %d forecast records\", len(forecast_df))\n\n    # Write to BigQuery\n\
+          \    forecast_df.to_gbq(batch_forecast_bq_table, project_id=project_id,\
+          \ if_exists=\"append\")\n    logger.info(\"Batch forecasts written to: %s\"\
+          , batch_forecast_bq_table)\n\n    result = {\n        \"champion_model_type\"\
+          : champion_model_type,\n        \"forecast_count\": len(forecast_df),\n\
+          \        \"horizon\": horizon,\n    }\n\n    logger.info(\"Batch forecast\
+          \ component completed\")\n    return json.dumps(result)\n\n"
+        image: python:3.11
+    exec-register-and-deploy-champion-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - register_and_deploy_champion_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'google-cloud-aiplatform>=1.48.0'  &&  python3 -m pip install --quiet\
+          \ --no-warn-script-location 'kfp==2.16.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef register_and_deploy_champion_component(\n    project_id: str,\n\
+          \    region: str,\n    champion_result: str,\n    endpoint_display_name:\
+          \ str,\n) -> str:\n    \"\"\"Register the champion model and deploy to Vertex\
+          \ AI Endpoint.\"\"\"\n    import json\n    import logging\n\n    logging.basicConfig(\n\
+          \        level=logging.INFO,\n        format=\"%(asctime)s | %(levelname)s\
+          \ | %(name)s | %(message)s\",\n    )\n    logger = logging.getLogger(\"\
+          register_and_deploy_champion_component\")\n\n    champion = json.loads(champion_result)\n\
+          \    champion_model_type = champion[\"champion_model_type\"]\n\n    logger.info(\"\
+          Registering and deploying champion model_type=%s to endpoint=%s\", champion_model_type,\
+          \ endpoint_display_name)\n\n    # For this simplified version, just log\
+          \ the action\n    # In production, you'd use aiplatform.Model.upload()\n\
+          \n    result = {\n        \"champion_model_type\": champion_model_type,\n\
+          \        \"champion_model_uri\": champion.get(\"champion_model_uri\"),\n\
+          \        \"endpoint_display_name\": endpoint_display_name,\n        \"region\"\
+          : region,\n        \"project_id\": project_id,\n        \"status\": \"deployment_skipped_in_demo\"\
+          ,\n    }\n\n    logger.info(\"Register and deploy component completed\"\
+          )\n    return json.dumps(result)\n\n"
+        image: python:3.11
+    exec-select-champion-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - select_champion_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'google-cloud-bigquery>=3.25.0'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.16.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef select_champion_component(\n    project_id: str,\n    champion_bq_table:\
+          \ str,\n    training_results_json: str,\n    metric_name: str = \"wmape\"\
+          ,\n) -> str:\n    \"\"\"Select and persist the champion model from aggregated\
+          \ results.\"\"\"\n    import json\n    import logging\n    import pandas\
+          \ as pd\n    from google.cloud import bigquery\n\n    logging.basicConfig(\n\
+          \        level=logging.INFO,\n        format=\"%(asctime)s | %(levelname)s\
+          \ | %(name)s | %(message)s\",\n    )\n    logger = logging.getLogger(\"\
+          select_champion_component\")\n\n    results = json.loads(training_results_json)\n\
+          \    if not isinstance(results, list):\n        results = [results]\n\n\
+          \    valid_results = [result for result in results if metric_name in result\
+          \ and result[metric_name] is not None]\n    if not valid_results:\n    \
+          \    raise ValueError(f\"No valid results found for metric '{metric_name}'.\"\
+          )\n\n    champion = min(valid_results, key=lambda result: result[metric_name])\n\
+          \    logger.info(\n        \"Champion selected: model_type=%s, %s=%.6f\"\
+          ,\n        champion[\"model_type\"],\n        metric_name,\n        champion[metric_name],\n\
+          \    )\n\n    champion_summary = {\n        \"run_ts\": pd.Timestamp.utcnow().isoformat(),\n\
+          \        \"champion_model_type\": champion[\"model_type\"],\n        \"\
+          champion_metric_name\": metric_name,\n        \"champion_metric_value\"\
+          : champion[metric_name],\n        \"champion_model_uri\": champion.get(\"\
+          model_uri\"),\n        \"model_display_name\": champion.get(\"model_display_name\"\
+          ),\n        \"source_table\": champion.get(\"source_table\"),\n        \"\
+          prediction_bq_table\": champion.get(\"prediction_bq_table\"),\n        \"\
+          forecast_freq\": champion.get(\"forecast_freq\"),\n        \"horizon\":\
+          \ champion.get(\"horizon\"),\n    }\n\n    table_id = f\"{project_id}.{champion_bq_table}\"\
+          \n    bq_client = bigquery.Client(project=project_id)\n    errors = bq_client.insert_rows_json(table_id,\
+          \ [champion_summary], skip_invalid_rows=True)\n    if errors:\n        raise\
+          \ RuntimeError(f\"Failed to persist champion summary: {errors}\")\n\n  \
+          \  logger.info(\"Champion summary persisted to BigQuery table: %s\", table_id)\n\
+          \    return json.dumps(champion_summary)\n\n"
+        image: python:3.11
+    exec-train-single-model-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_single_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'numpy>=1.26.0' 'scikit-learn>=1.4.0' 'lightgbm>=4.3.0' 'xgboost>=2.0.0'\
+          \ 'mlforecast>=0.13.0' 'statsmodels>=0.14.0' 'arch>=6.0.0' 'statsforecast>=1.5.0'\
+          \ 'google-cloud-bigquery>=3.25.0' 'google-cloud-storage>=2.18.0' 'pandas-gbq>=0.28.0'\
+          \ 'pyarrow>=17.0.0' 'db-dtypes>=1.2.0'  &&  python3 -m pip install --quiet\
+          \ --no-warn-script-location 'kfp==2.16.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_single_model_component(\n    project_id: str,\n    bq_table:\
+          \ str,\n    prediction_bq_table: str,\n    forecast_freq: str,\n    horizon:\
+          \ int,\n    lags: list[int],\n    date_features: list[str],\n    model_display_name:\
+          \ str,\n    model_type: str,\n    model_artifact: Output[Model],\n    eval_metrics:\
+          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> str:\n\
+          \    \"\"\"Train a single model type and return metadata JSON.\"\"\"\n \
+          \   import json\n    import logging\n    from pathlib import Path\n\n  \
+          \  logging.basicConfig(\n        level=logging.INFO,\n        format=\"\
+          %(asctime)s | %(levelname)s | %(name)s | %(message)s\",\n    )\n    logger\
+          \ = logging.getLogger(\"train_single_model_component\")\n    logger.info(\"\
+          Starting training for model_type=%s\", model_type)\n\n    try:\n       \
+          \ import pandas as pd\n        import numpy as np\n        from sklearn.ensemble\
+          \ import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor\n\
+          \        from sklearn.linear_model import Ridge\n        from sklearn.svm\
+          \ import SVR\n        from lightgbm import LGBMRegressor\n        from xgboost\
+          \ import XGBRegressor\n        from mlforecast import MLForecast\n     \
+          \   from statsmodels.tsa.arima.model import ARIMA\n        from statsmodels.tsa.exponential_smoothing.ets\
+          \ import ExponentialSmoothing\n        from statsforecast.models import\
+          \ AutoARIMA, AutoETS, AutoTheta, IMAPA, ADIDA, CrostonClassic, CrostonOptimized,\
+          \ CrostonSBA, MSTL, AutoCES\n        from arch import arch_model\n     \
+          \   from google.cloud import bigquery, storage\n\n        # Initialize BigQuery\
+          \ client\n        bq_client = bigquery.Client(project=project_id)\n    \
+          \    logger.info(\"BigQuery client initialized for project=%s\", project_id)\n\
+          \n        # Load training data from BigQuery\n        query = f\"\"\"\n\
+          \        SELECT unique_id, ds, y\n        FROM `{project_id}.{bq_table}`\n\
+          \        ORDER BY unique_id, ds\n        \"\"\"\n        logger.info(\"\
+          Loading data from BigQuery table: %s\", bq_table)\n        df = bq_client.query(query).to_dataframe()\n\
+          \        df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n        logger.info(\"\
+          Loaded %d rows from BigQuery\", len(df))\n\n        # Prepare model based\
+          \ on type\n        if model_type == \"lgbm\":\n            model = LGBMRegressor(verbosity=-1,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"rf\":\n      \
+          \      model = RandomForestRegressor(n_estimators=100, random_state=0, n_jobs=1)\n\
+          \        elif model_type == \"et\":\n            model = ExtraTreesRegressor(n_estimators=100,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"xgb\":\n     \
+          \       model = XGBRegressor(random_state=0, n_jobs=1)\n        elif model_type\
+          \ == \"gb\":\n            model = GradientBoostingRegressor(random_state=0)\n\
+          \        elif model_type == \"ridge\":\n            model = Ridge()\n  \
+          \      elif model_type == \"svr\":\n            model = SVR()\n        elif\
+          \ model_type == \"arima\":\n            model = AutoARIMA(season_length=12,\
+          \ trace=True)\n        elif model_type == \"ets\":\n            model =\
+          \ AutoETS(season_length=12, trace=True)\n        elif model_type == \"theta\"\
+          :\n            model = AutoTheta()\n        elif model_type == \"imapa\"\
+          :\n            model = IMAPA()\n        elif model_type == \"adida\":\n\
+          \            model = ADIDA()\n        elif model_type == \"croston\":\n\
+          \            model = CrostonClassic()\n        elif model_type == \"croston_optimized\"\
+          :\n            model = CrostonOptimized()\n        elif model_type == \"\
+          croston_sba\":\n            model = CrostonSBA()\n        elif model_type\
+          \ == \"mstl\":\n            model = MSTL(season_length=24)\n        elif\
+          \ model_type.startswith(\"garch_\"):\n            parts = model_type.split(\"\
+          _\")\n            p, q = int(parts[1]), int(parts[2])\n            model\
+          \ = arch_model(None, vol=\"Garch\", p=p, q=q)\n        elif model_type.startswith(\"\
+          arch_\"):\n            p = int(model_type.split(\"_\")[1])\n           \
+          \ model = arch_model(None, vol=\"ARCH\", p=p)\n        else:\n         \
+          \   raise ValueError(f\"Unsupported model_type: {model_type}\")\n\n    \
+          \    logger.info(\"Initialized model for model_type=%s\", model_type)\n\n\
+          \        # Set up MLForecast\n        allowed_date_features = [\"year\"\
+          , \"month\", \"week\", \"day\", \"dayofweek\", \"dayofyear\", \"quarter\"\
+          ]\n        parsed_date_features = [x for x in date_features if x in allowed_date_features]\n\
+          \n        fcst = MLForecast(\n            models={model_type: model},\n\
+          \            freq=forecast_freq,\n            lags=lags,\n            date_features=parsed_date_features,\n\
+          \            num_threads=1,\n        )\n\n        # Train/val split by series\n\
+          \        unique_ids = df[\"unique_id\"].unique()\n        train_df = df[df[\"\
+          unique_id\"].isin(unique_ids)]  # All for simplicity\n        valid_df =\
+          \ df[df[\"unique_id\"].isin(unique_ids)].tail(horizon * len(unique_ids))\n\
+          \n        logger.info(\"Training data: %d rows\", len(train_df))\n\n   \
+          \     # Fit model\n        fcst.fit(train_df)\n        logger.info(\"Model\
+          \ fitted successfully\")\n\n        # Generate predictions\n        Y_hat_df\
+          \ = fcst.predict(h=horizon)\n        logger.info(\"Predictions generated\
+          \ for horizon=%d\", horizon)\n\n        # Calculate metrics (WMAPE, MAE,\
+          \ RMSE)\n        def wmape(y_true, y_pred):\n            denominator = y_true.abs().sum()\n\
+          \            return (((y_true - y_pred).abs().sum() / denominator) * 100)\
+          \ if denominator > 0 else 0\n\n        if len(valid_df) > 0:\n         \
+          \   y_true = valid_df.set_index([\"unique_id\", \"ds\"])[\"y\"]\n      \
+          \      y_pred = Y_hat_df.set_index([\"unique_id\", \"ds\"])[model_type]\n\
+          \            metric_wmape = wmape(y_true, y_pred)\n            metric_mae\
+          \ = (y_true - y_pred).abs().mean()\n            metric_rmse = (((y_true\
+          \ - y_pred) ** 2).mean() ** 0.5)\n        else:\n            metric_wmape\
+          \ = metric_mae = metric_rmse = 0.0\n\n        logger.info(\"Metrics - WMAPE:\
+          \ %.4f, MAE: %.4f, RMSE: %.4f\", metric_wmape, metric_mae, metric_rmse)\n\
+          \n        # Save model artifact\n        model_dir = Path(\"/tmp/model_artifacts\"\
+          )\n        model_dir.mkdir(parents=True, exist_ok=True)\n        model_path\
+          \ = model_dir / f\"{model_type}_model.pkl\"\n        import pickle\n   \
+          \     with open(model_path, \"wb\") as f:\n            pickle.dump(fcst,\
+          \ f)\n        logger.info(\"Model saved to %s\", model_path)\n\n       \
+          \ # Upload to GCS\n        storage_client = storage.Client(project=project_id)\n\
+          \        bucket_name = f\"{project_id}-mlforecast-models\"\n        blob_path\
+          \ = f\"models/{model_display_name}/{model_type}/model.pkl\"\n        try:\n\
+          \            bucket = storage_client.bucket(bucket_name)\n            blob\
+          \ = bucket.blob(blob_path)\n            blob.upload_from_filename(model_path)\n\
+          \            model_uri = f\"gs://{bucket_name}/{blob_path}\"\n         \
+          \   logger.info(\"Model uploaded to %s\", model_uri)\n        except Exception\
+          \ as e:\n            logger.warning(\"Could not upload to GCS: %s, using\
+          \ local path\", str(e))\n            model_uri = str(model_path)\n\n   \
+          \     # Write predictions to BigQuery using the expected evaluation schema.\n\
+          \        predictions_table = prediction_bq_table\n        run_ts = pd.Timestamp.utcnow()\n\
+          \        prediction_df = Y_hat_df.rename(columns={model_type: \"prediction\"\
+          }).copy()\n        validation_cols = valid_df[[\"unique_id\", \"ds\", \"\
+          y\"]].copy() if len(valid_df) > 0 else df[[\"unique_id\", \"ds\", \"y\"\
+          ]].tail(len(prediction_df)).copy()\n        prediction_df = prediction_df.merge(validation_cols,\
+          \ on=[\"unique_id\", \"ds\"], how=\"left\")\n        prediction_df[\"run_ts\"\
+          ] = run_ts\n        prediction_df[\"model_display_name\"] = model_display_name\n\
+          \        prediction_df[\"model_type\"] = model_type\n        prediction_df[\"\
+          source_table\"] = bq_table\n        prediction_df[\"forecast_freq\"] = forecast_freq\n\
+          \        prediction_df[\"horizon\"] = horizon\n        prediction_df = prediction_df[[\n\
+          \            \"unique_id\",\n            \"ds\",\n            \"y\",\n \
+          \           \"prediction\",\n            \"run_ts\",\n            \"model_display_name\"\
+          ,\n            \"model_type\",\n            \"source_table\",\n        \
+          \    \"forecast_freq\",\n            \"horizon\",\n        ]]\n        prediction_df.to_gbq(predictions_table,\
+          \ project_id=project_id, if_exists=\"append\")\n        logger.info(\"Predictions\
+          \ written to BigQuery table: %s\", predictions_table)\n\n        # Build\
+          \ result metadata\n        metadata = {\n            \"model_type\": model_type,\n\
+          \            \"forecast_freq\": forecast_freq,\n            \"horizon\"\
+          : horizon,\n            \"lags\": lags,\n            \"date_features\":\
+          \ parsed_date_features,\n            \"train_rows\": int(len(train_df)),\n\
+          \            \"valid_rows\": int(len(valid_df)),\n            \"series_count\"\
+          : int(df[\"unique_id\"].nunique()),\n            \"rmse\": float(metric_rmse),\n\
+          \            \"mae\": float(metric_mae),\n            \"wmape\": float(metric_wmape),\n\
+          \            \"model_uri\": model_uri,\n            \"model_display_name\"\
+          : model_display_name,\n            \"source_table\": bq_table,\n       \
+          \     \"prediction_bq_table\": prediction_bq_table,\n        }\n\n     \
+          \   # Write metadata.json\n        with open(model_dir / \"metadata.json\"\
+          , \"w\", encoding=\"utf-8\") as f:\n            json.dump(metadata, f, indent=2)\n\
+          \n        logger.info(\"Training component completed successfully for model_type=%s\"\
+          , model_type)\n        return json.dumps(metadata)\n\n    except Exception\
+          \ as e:\n        logger.error(\"Error in training component: %s\", str(e),\
+          \ exc_info=True)\n        # Return minimal result on error\n        return\
+          \ json.dumps({\"model_type\": model_type, \"error\": str(e), \"wmape\":\
+          \ 999999.0})\n\n"
+        image: python:3.11
+    exec-train-single-model-component-2:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_single_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'numpy>=1.26.0' 'scikit-learn>=1.4.0' 'lightgbm>=4.3.0' 'xgboost>=2.0.0'\
+          \ 'mlforecast>=0.13.0' 'statsmodels>=0.14.0' 'arch>=6.0.0' 'statsforecast>=1.5.0'\
+          \ 'google-cloud-bigquery>=3.25.0' 'google-cloud-storage>=2.18.0' 'pandas-gbq>=0.28.0'\
+          \ 'pyarrow>=17.0.0' 'db-dtypes>=1.2.0'  &&  python3 -m pip install --quiet\
+          \ --no-warn-script-location 'kfp==2.16.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_single_model_component(\n    project_id: str,\n    bq_table:\
+          \ str,\n    prediction_bq_table: str,\n    forecast_freq: str,\n    horizon:\
+          \ int,\n    lags: list[int],\n    date_features: list[str],\n    model_display_name:\
+          \ str,\n    model_type: str,\n    model_artifact: Output[Model],\n    eval_metrics:\
+          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> str:\n\
+          \    \"\"\"Train a single model type and return metadata JSON.\"\"\"\n \
+          \   import json\n    import logging\n    from pathlib import Path\n\n  \
+          \  logging.basicConfig(\n        level=logging.INFO,\n        format=\"\
+          %(asctime)s | %(levelname)s | %(name)s | %(message)s\",\n    )\n    logger\
+          \ = logging.getLogger(\"train_single_model_component\")\n    logger.info(\"\
+          Starting training for model_type=%s\", model_type)\n\n    try:\n       \
+          \ import pandas as pd\n        import numpy as np\n        from sklearn.ensemble\
+          \ import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor\n\
+          \        from sklearn.linear_model import Ridge\n        from sklearn.svm\
+          \ import SVR\n        from lightgbm import LGBMRegressor\n        from xgboost\
+          \ import XGBRegressor\n        from mlforecast import MLForecast\n     \
+          \   from statsmodels.tsa.arima.model import ARIMA\n        from statsmodels.tsa.exponential_smoothing.ets\
+          \ import ExponentialSmoothing\n        from statsforecast.models import\
+          \ AutoARIMA, AutoETS, AutoTheta, IMAPA, ADIDA, CrostonClassic, CrostonOptimized,\
+          \ CrostonSBA, MSTL, AutoCES\n        from arch import arch_model\n     \
+          \   from google.cloud import bigquery, storage\n\n        # Initialize BigQuery\
+          \ client\n        bq_client = bigquery.Client(project=project_id)\n    \
+          \    logger.info(\"BigQuery client initialized for project=%s\", project_id)\n\
+          \n        # Load training data from BigQuery\n        query = f\"\"\"\n\
+          \        SELECT unique_id, ds, y\n        FROM `{project_id}.{bq_table}`\n\
+          \        ORDER BY unique_id, ds\n        \"\"\"\n        logger.info(\"\
+          Loading data from BigQuery table: %s\", bq_table)\n        df = bq_client.query(query).to_dataframe()\n\
+          \        df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n        logger.info(\"\
+          Loaded %d rows from BigQuery\", len(df))\n\n        # Prepare model based\
+          \ on type\n        if model_type == \"lgbm\":\n            model = LGBMRegressor(verbosity=-1,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"rf\":\n      \
+          \      model = RandomForestRegressor(n_estimators=100, random_state=0, n_jobs=1)\n\
+          \        elif model_type == \"et\":\n            model = ExtraTreesRegressor(n_estimators=100,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"xgb\":\n     \
+          \       model = XGBRegressor(random_state=0, n_jobs=1)\n        elif model_type\
+          \ == \"gb\":\n            model = GradientBoostingRegressor(random_state=0)\n\
+          \        elif model_type == \"ridge\":\n            model = Ridge()\n  \
+          \      elif model_type == \"svr\":\n            model = SVR()\n        elif\
+          \ model_type == \"arima\":\n            model = AutoARIMA(season_length=12,\
+          \ trace=True)\n        elif model_type == \"ets\":\n            model =\
+          \ AutoETS(season_length=12, trace=True)\n        elif model_type == \"theta\"\
+          :\n            model = AutoTheta()\n        elif model_type == \"imapa\"\
+          :\n            model = IMAPA()\n        elif model_type == \"adida\":\n\
+          \            model = ADIDA()\n        elif model_type == \"croston\":\n\
+          \            model = CrostonClassic()\n        elif model_type == \"croston_optimized\"\
+          :\n            model = CrostonOptimized()\n        elif model_type == \"\
+          croston_sba\":\n            model = CrostonSBA()\n        elif model_type\
+          \ == \"mstl\":\n            model = MSTL(season_length=24)\n        elif\
+          \ model_type.startswith(\"garch_\"):\n            parts = model_type.split(\"\
+          _\")\n            p, q = int(parts[1]), int(parts[2])\n            model\
+          \ = arch_model(None, vol=\"Garch\", p=p, q=q)\n        elif model_type.startswith(\"\
+          arch_\"):\n            p = int(model_type.split(\"_\")[1])\n           \
+          \ model = arch_model(None, vol=\"ARCH\", p=p)\n        else:\n         \
+          \   raise ValueError(f\"Unsupported model_type: {model_type}\")\n\n    \
+          \    logger.info(\"Initialized model for model_type=%s\", model_type)\n\n\
+          \        # Set up MLForecast\n        allowed_date_features = [\"year\"\
+          , \"month\", \"week\", \"day\", \"dayofweek\", \"dayofyear\", \"quarter\"\
+          ]\n        parsed_date_features = [x for x in date_features if x in allowed_date_features]\n\
+          \n        fcst = MLForecast(\n            models={model_type: model},\n\
+          \            freq=forecast_freq,\n            lags=lags,\n            date_features=parsed_date_features,\n\
+          \            num_threads=1,\n        )\n\n        # Train/val split by series\n\
+          \        unique_ids = df[\"unique_id\"].unique()\n        train_df = df[df[\"\
+          unique_id\"].isin(unique_ids)]  # All for simplicity\n        valid_df =\
+          \ df[df[\"unique_id\"].isin(unique_ids)].tail(horizon * len(unique_ids))\n\
+          \n        logger.info(\"Training data: %d rows\", len(train_df))\n\n   \
+          \     # Fit model\n        fcst.fit(train_df)\n        logger.info(\"Model\
+          \ fitted successfully\")\n\n        # Generate predictions\n        Y_hat_df\
+          \ = fcst.predict(h=horizon)\n        logger.info(\"Predictions generated\
+          \ for horizon=%d\", horizon)\n\n        # Calculate metrics (WMAPE, MAE,\
+          \ RMSE)\n        def wmape(y_true, y_pred):\n            denominator = y_true.abs().sum()\n\
+          \            return (((y_true - y_pred).abs().sum() / denominator) * 100)\
+          \ if denominator > 0 else 0\n\n        if len(valid_df) > 0:\n         \
+          \   y_true = valid_df.set_index([\"unique_id\", \"ds\"])[\"y\"]\n      \
+          \      y_pred = Y_hat_df.set_index([\"unique_id\", \"ds\"])[model_type]\n\
+          \            metric_wmape = wmape(y_true, y_pred)\n            metric_mae\
+          \ = (y_true - y_pred).abs().mean()\n            metric_rmse = (((y_true\
+          \ - y_pred) ** 2).mean() ** 0.5)\n        else:\n            metric_wmape\
+          \ = metric_mae = metric_rmse = 0.0\n\n        logger.info(\"Metrics - WMAPE:\
+          \ %.4f, MAE: %.4f, RMSE: %.4f\", metric_wmape, metric_mae, metric_rmse)\n\
+          \n        # Save model artifact\n        model_dir = Path(\"/tmp/model_artifacts\"\
+          )\n        model_dir.mkdir(parents=True, exist_ok=True)\n        model_path\
+          \ = model_dir / f\"{model_type}_model.pkl\"\n        import pickle\n   \
+          \     with open(model_path, \"wb\") as f:\n            pickle.dump(fcst,\
+          \ f)\n        logger.info(\"Model saved to %s\", model_path)\n\n       \
+          \ # Upload to GCS\n        storage_client = storage.Client(project=project_id)\n\
+          \        bucket_name = f\"{project_id}-mlforecast-models\"\n        blob_path\
+          \ = f\"models/{model_display_name}/{model_type}/model.pkl\"\n        try:\n\
+          \            bucket = storage_client.bucket(bucket_name)\n            blob\
+          \ = bucket.blob(blob_path)\n            blob.upload_from_filename(model_path)\n\
+          \            model_uri = f\"gs://{bucket_name}/{blob_path}\"\n         \
+          \   logger.info(\"Model uploaded to %s\", model_uri)\n        except Exception\
+          \ as e:\n            logger.warning(\"Could not upload to GCS: %s, using\
+          \ local path\", str(e))\n            model_uri = str(model_path)\n\n   \
+          \     # Write predictions to BigQuery using the expected evaluation schema.\n\
+          \        predictions_table = prediction_bq_table\n        run_ts = pd.Timestamp.utcnow()\n\
+          \        prediction_df = Y_hat_df.rename(columns={model_type: \"prediction\"\
+          }).copy()\n        validation_cols = valid_df[[\"unique_id\", \"ds\", \"\
+          y\"]].copy() if len(valid_df) > 0 else df[[\"unique_id\", \"ds\", \"y\"\
+          ]].tail(len(prediction_df)).copy()\n        prediction_df = prediction_df.merge(validation_cols,\
+          \ on=[\"unique_id\", \"ds\"], how=\"left\")\n        prediction_df[\"run_ts\"\
+          ] = run_ts\n        prediction_df[\"model_display_name\"] = model_display_name\n\
+          \        prediction_df[\"model_type\"] = model_type\n        prediction_df[\"\
+          source_table\"] = bq_table\n        prediction_df[\"forecast_freq\"] = forecast_freq\n\
+          \        prediction_df[\"horizon\"] = horizon\n        prediction_df = prediction_df[[\n\
+          \            \"unique_id\",\n            \"ds\",\n            \"y\",\n \
+          \           \"prediction\",\n            \"run_ts\",\n            \"model_display_name\"\
+          ,\n            \"model_type\",\n            \"source_table\",\n        \
+          \    \"forecast_freq\",\n            \"horizon\",\n        ]]\n        prediction_df.to_gbq(predictions_table,\
+          \ project_id=project_id, if_exists=\"append\")\n        logger.info(\"Predictions\
+          \ written to BigQuery table: %s\", predictions_table)\n\n        # Build\
+          \ result metadata\n        metadata = {\n            \"model_type\": model_type,\n\
+          \            \"forecast_freq\": forecast_freq,\n            \"horizon\"\
+          : horizon,\n            \"lags\": lags,\n            \"date_features\":\
+          \ parsed_date_features,\n            \"train_rows\": int(len(train_df)),\n\
+          \            \"valid_rows\": int(len(valid_df)),\n            \"series_count\"\
+          : int(df[\"unique_id\"].nunique()),\n            \"rmse\": float(metric_rmse),\n\
+          \            \"mae\": float(metric_mae),\n            \"wmape\": float(metric_wmape),\n\
+          \            \"model_uri\": model_uri,\n            \"model_display_name\"\
+          : model_display_name,\n            \"source_table\": bq_table,\n       \
+          \     \"prediction_bq_table\": prediction_bq_table,\n        }\n\n     \
+          \   # Write metadata.json\n        with open(model_dir / \"metadata.json\"\
+          , \"w\", encoding=\"utf-8\") as f:\n            json.dump(metadata, f, indent=2)\n\
+          \n        logger.info(\"Training component completed successfully for model_type=%s\"\
+          , model_type)\n        return json.dumps(metadata)\n\n    except Exception\
+          \ as e:\n        logger.error(\"Error in training component: %s\", str(e),\
+          \ exc_info=True)\n        # Return minimal result on error\n        return\
+          \ json.dumps({\"model_type\": model_type, \"error\": str(e), \"wmape\":\
+          \ 999999.0})\n\n"
+        image: python:3.11
+    exec-train-single-model-component-3:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_single_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'numpy>=1.26.0' 'scikit-learn>=1.4.0' 'lightgbm>=4.3.0' 'xgboost>=2.0.0'\
+          \ 'mlforecast>=0.13.0' 'statsmodels>=0.14.0' 'arch>=6.0.0' 'statsforecast>=1.5.0'\
+          \ 'google-cloud-bigquery>=3.25.0' 'google-cloud-storage>=2.18.0' 'pandas-gbq>=0.28.0'\
+          \ 'pyarrow>=17.0.0' 'db-dtypes>=1.2.0'  &&  python3 -m pip install --quiet\
+          \ --no-warn-script-location 'kfp==2.16.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_single_model_component(\n    project_id: str,\n    bq_table:\
+          \ str,\n    prediction_bq_table: str,\n    forecast_freq: str,\n    horizon:\
+          \ int,\n    lags: list[int],\n    date_features: list[str],\n    model_display_name:\
+          \ str,\n    model_type: str,\n    model_artifact: Output[Model],\n    eval_metrics:\
+          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> str:\n\
+          \    \"\"\"Train a single model type and return metadata JSON.\"\"\"\n \
+          \   import json\n    import logging\n    from pathlib import Path\n\n  \
+          \  logging.basicConfig(\n        level=logging.INFO,\n        format=\"\
+          %(asctime)s | %(levelname)s | %(name)s | %(message)s\",\n    )\n    logger\
+          \ = logging.getLogger(\"train_single_model_component\")\n    logger.info(\"\
+          Starting training for model_type=%s\", model_type)\n\n    try:\n       \
+          \ import pandas as pd\n        import numpy as np\n        from sklearn.ensemble\
+          \ import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor\n\
+          \        from sklearn.linear_model import Ridge\n        from sklearn.svm\
+          \ import SVR\n        from lightgbm import LGBMRegressor\n        from xgboost\
+          \ import XGBRegressor\n        from mlforecast import MLForecast\n     \
+          \   from statsmodels.tsa.arima.model import ARIMA\n        from statsmodels.tsa.exponential_smoothing.ets\
+          \ import ExponentialSmoothing\n        from statsforecast.models import\
+          \ AutoARIMA, AutoETS, AutoTheta, IMAPA, ADIDA, CrostonClassic, CrostonOptimized,\
+          \ CrostonSBA, MSTL, AutoCES\n        from arch import arch_model\n     \
+          \   from google.cloud import bigquery, storage\n\n        # Initialize BigQuery\
+          \ client\n        bq_client = bigquery.Client(project=project_id)\n    \
+          \    logger.info(\"BigQuery client initialized for project=%s\", project_id)\n\
+          \n        # Load training data from BigQuery\n        query = f\"\"\"\n\
+          \        SELECT unique_id, ds, y\n        FROM `{project_id}.{bq_table}`\n\
+          \        ORDER BY unique_id, ds\n        \"\"\"\n        logger.info(\"\
+          Loading data from BigQuery table: %s\", bq_table)\n        df = bq_client.query(query).to_dataframe()\n\
+          \        df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n        logger.info(\"\
+          Loaded %d rows from BigQuery\", len(df))\n\n        # Prepare model based\
+          \ on type\n        if model_type == \"lgbm\":\n            model = LGBMRegressor(verbosity=-1,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"rf\":\n      \
+          \      model = RandomForestRegressor(n_estimators=100, random_state=0, n_jobs=1)\n\
+          \        elif model_type == \"et\":\n            model = ExtraTreesRegressor(n_estimators=100,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"xgb\":\n     \
+          \       model = XGBRegressor(random_state=0, n_jobs=1)\n        elif model_type\
+          \ == \"gb\":\n            model = GradientBoostingRegressor(random_state=0)\n\
+          \        elif model_type == \"ridge\":\n            model = Ridge()\n  \
+          \      elif model_type == \"svr\":\n            model = SVR()\n        elif\
+          \ model_type == \"arima\":\n            model = AutoARIMA(season_length=12,\
+          \ trace=True)\n        elif model_type == \"ets\":\n            model =\
+          \ AutoETS(season_length=12, trace=True)\n        elif model_type == \"theta\"\
+          :\n            model = AutoTheta()\n        elif model_type == \"imapa\"\
+          :\n            model = IMAPA()\n        elif model_type == \"adida\":\n\
+          \            model = ADIDA()\n        elif model_type == \"croston\":\n\
+          \            model = CrostonClassic()\n        elif model_type == \"croston_optimized\"\
+          :\n            model = CrostonOptimized()\n        elif model_type == \"\
+          croston_sba\":\n            model = CrostonSBA()\n        elif model_type\
+          \ == \"mstl\":\n            model = MSTL(season_length=24)\n        elif\
+          \ model_type.startswith(\"garch_\"):\n            parts = model_type.split(\"\
+          _\")\n            p, q = int(parts[1]), int(parts[2])\n            model\
+          \ = arch_model(None, vol=\"Garch\", p=p, q=q)\n        elif model_type.startswith(\"\
+          arch_\"):\n            p = int(model_type.split(\"_\")[1])\n           \
+          \ model = arch_model(None, vol=\"ARCH\", p=p)\n        else:\n         \
+          \   raise ValueError(f\"Unsupported model_type: {model_type}\")\n\n    \
+          \    logger.info(\"Initialized model for model_type=%s\", model_type)\n\n\
+          \        # Set up MLForecast\n        allowed_date_features = [\"year\"\
+          , \"month\", \"week\", \"day\", \"dayofweek\", \"dayofyear\", \"quarter\"\
+          ]\n        parsed_date_features = [x for x in date_features if x in allowed_date_features]\n\
+          \n        fcst = MLForecast(\n            models={model_type: model},\n\
+          \            freq=forecast_freq,\n            lags=lags,\n            date_features=parsed_date_features,\n\
+          \            num_threads=1,\n        )\n\n        # Train/val split by series\n\
+          \        unique_ids = df[\"unique_id\"].unique()\n        train_df = df[df[\"\
+          unique_id\"].isin(unique_ids)]  # All for simplicity\n        valid_df =\
+          \ df[df[\"unique_id\"].isin(unique_ids)].tail(horizon * len(unique_ids))\n\
+          \n        logger.info(\"Training data: %d rows\", len(train_df))\n\n   \
+          \     # Fit model\n        fcst.fit(train_df)\n        logger.info(\"Model\
+          \ fitted successfully\")\n\n        # Generate predictions\n        Y_hat_df\
+          \ = fcst.predict(h=horizon)\n        logger.info(\"Predictions generated\
+          \ for horizon=%d\", horizon)\n\n        # Calculate metrics (WMAPE, MAE,\
+          \ RMSE)\n        def wmape(y_true, y_pred):\n            denominator = y_true.abs().sum()\n\
+          \            return (((y_true - y_pred).abs().sum() / denominator) * 100)\
+          \ if denominator > 0 else 0\n\n        if len(valid_df) > 0:\n         \
+          \   y_true = valid_df.set_index([\"unique_id\", \"ds\"])[\"y\"]\n      \
+          \      y_pred = Y_hat_df.set_index([\"unique_id\", \"ds\"])[model_type]\n\
+          \            metric_wmape = wmape(y_true, y_pred)\n            metric_mae\
+          \ = (y_true - y_pred).abs().mean()\n            metric_rmse = (((y_true\
+          \ - y_pred) ** 2).mean() ** 0.5)\n        else:\n            metric_wmape\
+          \ = metric_mae = metric_rmse = 0.0\n\n        logger.info(\"Metrics - WMAPE:\
+          \ %.4f, MAE: %.4f, RMSE: %.4f\", metric_wmape, metric_mae, metric_rmse)\n\
+          \n        # Save model artifact\n        model_dir = Path(\"/tmp/model_artifacts\"\
+          )\n        model_dir.mkdir(parents=True, exist_ok=True)\n        model_path\
+          \ = model_dir / f\"{model_type}_model.pkl\"\n        import pickle\n   \
+          \     with open(model_path, \"wb\") as f:\n            pickle.dump(fcst,\
+          \ f)\n        logger.info(\"Model saved to %s\", model_path)\n\n       \
+          \ # Upload to GCS\n        storage_client = storage.Client(project=project_id)\n\
+          \        bucket_name = f\"{project_id}-mlforecast-models\"\n        blob_path\
+          \ = f\"models/{model_display_name}/{model_type}/model.pkl\"\n        try:\n\
+          \            bucket = storage_client.bucket(bucket_name)\n            blob\
+          \ = bucket.blob(blob_path)\n            blob.upload_from_filename(model_path)\n\
+          \            model_uri = f\"gs://{bucket_name}/{blob_path}\"\n         \
+          \   logger.info(\"Model uploaded to %s\", model_uri)\n        except Exception\
+          \ as e:\n            logger.warning(\"Could not upload to GCS: %s, using\
+          \ local path\", str(e))\n            model_uri = str(model_path)\n\n   \
+          \     # Write predictions to BigQuery using the expected evaluation schema.\n\
+          \        predictions_table = prediction_bq_table\n        run_ts = pd.Timestamp.utcnow()\n\
+          \        prediction_df = Y_hat_df.rename(columns={model_type: \"prediction\"\
+          }).copy()\n        validation_cols = valid_df[[\"unique_id\", \"ds\", \"\
+          y\"]].copy() if len(valid_df) > 0 else df[[\"unique_id\", \"ds\", \"y\"\
+          ]].tail(len(prediction_df)).copy()\n        prediction_df = prediction_df.merge(validation_cols,\
+          \ on=[\"unique_id\", \"ds\"], how=\"left\")\n        prediction_df[\"run_ts\"\
+          ] = run_ts\n        prediction_df[\"model_display_name\"] = model_display_name\n\
+          \        prediction_df[\"model_type\"] = model_type\n        prediction_df[\"\
+          source_table\"] = bq_table\n        prediction_df[\"forecast_freq\"] = forecast_freq\n\
+          \        prediction_df[\"horizon\"] = horizon\n        prediction_df = prediction_df[[\n\
+          \            \"unique_id\",\n            \"ds\",\n            \"y\",\n \
+          \           \"prediction\",\n            \"run_ts\",\n            \"model_display_name\"\
+          ,\n            \"model_type\",\n            \"source_table\",\n        \
+          \    \"forecast_freq\",\n            \"horizon\",\n        ]]\n        prediction_df.to_gbq(predictions_table,\
+          \ project_id=project_id, if_exists=\"append\")\n        logger.info(\"Predictions\
+          \ written to BigQuery table: %s\", predictions_table)\n\n        # Build\
+          \ result metadata\n        metadata = {\n            \"model_type\": model_type,\n\
+          \            \"forecast_freq\": forecast_freq,\n            \"horizon\"\
+          : horizon,\n            \"lags\": lags,\n            \"date_features\":\
+          \ parsed_date_features,\n            \"train_rows\": int(len(train_df)),\n\
+          \            \"valid_rows\": int(len(valid_df)),\n            \"series_count\"\
+          : int(df[\"unique_id\"].nunique()),\n            \"rmse\": float(metric_rmse),\n\
+          \            \"mae\": float(metric_mae),\n            \"wmape\": float(metric_wmape),\n\
+          \            \"model_uri\": model_uri,\n            \"model_display_name\"\
+          : model_display_name,\n            \"source_table\": bq_table,\n       \
+          \     \"prediction_bq_table\": prediction_bq_table,\n        }\n\n     \
+          \   # Write metadata.json\n        with open(model_dir / \"metadata.json\"\
+          , \"w\", encoding=\"utf-8\") as f:\n            json.dump(metadata, f, indent=2)\n\
+          \n        logger.info(\"Training component completed successfully for model_type=%s\"\
+          , model_type)\n        return json.dumps(metadata)\n\n    except Exception\
+          \ as e:\n        logger.error(\"Error in training component: %s\", str(e),\
+          \ exc_info=True)\n        # Return minimal result on error\n        return\
+          \ json.dumps({\"model_type\": model_type, \"error\": str(e), \"wmape\":\
+          \ 999999.0})\n\n"
+        image: python:3.11
+    exec-train-single-model-component-4:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_single_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'numpy>=1.26.0' 'scikit-learn>=1.4.0' 'lightgbm>=4.3.0' 'xgboost>=2.0.0'\
+          \ 'mlforecast>=0.13.0' 'statsmodels>=0.14.0' 'arch>=6.0.0' 'statsforecast>=1.5.0'\
+          \ 'google-cloud-bigquery>=3.25.0' 'google-cloud-storage>=2.18.0' 'pandas-gbq>=0.28.0'\
+          \ 'pyarrow>=17.0.0' 'db-dtypes>=1.2.0'  &&  python3 -m pip install --quiet\
+          \ --no-warn-script-location 'kfp==2.16.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_single_model_component(\n    project_id: str,\n    bq_table:\
+          \ str,\n    prediction_bq_table: str,\n    forecast_freq: str,\n    horizon:\
+          \ int,\n    lags: list[int],\n    date_features: list[str],\n    model_display_name:\
+          \ str,\n    model_type: str,\n    model_artifact: Output[Model],\n    eval_metrics:\
+          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> str:\n\
+          \    \"\"\"Train a single model type and return metadata JSON.\"\"\"\n \
+          \   import json\n    import logging\n    from pathlib import Path\n\n  \
+          \  logging.basicConfig(\n        level=logging.INFO,\n        format=\"\
+          %(asctime)s | %(levelname)s | %(name)s | %(message)s\",\n    )\n    logger\
+          \ = logging.getLogger(\"train_single_model_component\")\n    logger.info(\"\
+          Starting training for model_type=%s\", model_type)\n\n    try:\n       \
+          \ import pandas as pd\n        import numpy as np\n        from sklearn.ensemble\
+          \ import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor\n\
+          \        from sklearn.linear_model import Ridge\n        from sklearn.svm\
+          \ import SVR\n        from lightgbm import LGBMRegressor\n        from xgboost\
+          \ import XGBRegressor\n        from mlforecast import MLForecast\n     \
+          \   from statsmodels.tsa.arima.model import ARIMA\n        from statsmodels.tsa.exponential_smoothing.ets\
+          \ import ExponentialSmoothing\n        from statsforecast.models import\
+          \ AutoARIMA, AutoETS, AutoTheta, IMAPA, ADIDA, CrostonClassic, CrostonOptimized,\
+          \ CrostonSBA, MSTL, AutoCES\n        from arch import arch_model\n     \
+          \   from google.cloud import bigquery, storage\n\n        # Initialize BigQuery\
+          \ client\n        bq_client = bigquery.Client(project=project_id)\n    \
+          \    logger.info(\"BigQuery client initialized for project=%s\", project_id)\n\
+          \n        # Load training data from BigQuery\n        query = f\"\"\"\n\
+          \        SELECT unique_id, ds, y\n        FROM `{project_id}.{bq_table}`\n\
+          \        ORDER BY unique_id, ds\n        \"\"\"\n        logger.info(\"\
+          Loading data from BigQuery table: %s\", bq_table)\n        df = bq_client.query(query).to_dataframe()\n\
+          \        df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n        logger.info(\"\
+          Loaded %d rows from BigQuery\", len(df))\n\n        # Prepare model based\
+          \ on type\n        if model_type == \"lgbm\":\n            model = LGBMRegressor(verbosity=-1,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"rf\":\n      \
+          \      model = RandomForestRegressor(n_estimators=100, random_state=0, n_jobs=1)\n\
+          \        elif model_type == \"et\":\n            model = ExtraTreesRegressor(n_estimators=100,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"xgb\":\n     \
+          \       model = XGBRegressor(random_state=0, n_jobs=1)\n        elif model_type\
+          \ == \"gb\":\n            model = GradientBoostingRegressor(random_state=0)\n\
+          \        elif model_type == \"ridge\":\n            model = Ridge()\n  \
+          \      elif model_type == \"svr\":\n            model = SVR()\n        elif\
+          \ model_type == \"arima\":\n            model = AutoARIMA(season_length=12,\
+          \ trace=True)\n        elif model_type == \"ets\":\n            model =\
+          \ AutoETS(season_length=12, trace=True)\n        elif model_type == \"theta\"\
+          :\n            model = AutoTheta()\n        elif model_type == \"imapa\"\
+          :\n            model = IMAPA()\n        elif model_type == \"adida\":\n\
+          \            model = ADIDA()\n        elif model_type == \"croston\":\n\
+          \            model = CrostonClassic()\n        elif model_type == \"croston_optimized\"\
+          :\n            model = CrostonOptimized()\n        elif model_type == \"\
+          croston_sba\":\n            model = CrostonSBA()\n        elif model_type\
+          \ == \"mstl\":\n            model = MSTL(season_length=24)\n        elif\
+          \ model_type.startswith(\"garch_\"):\n            parts = model_type.split(\"\
+          _\")\n            p, q = int(parts[1]), int(parts[2])\n            model\
+          \ = arch_model(None, vol=\"Garch\", p=p, q=q)\n        elif model_type.startswith(\"\
+          arch_\"):\n            p = int(model_type.split(\"_\")[1])\n           \
+          \ model = arch_model(None, vol=\"ARCH\", p=p)\n        else:\n         \
+          \   raise ValueError(f\"Unsupported model_type: {model_type}\")\n\n    \
+          \    logger.info(\"Initialized model for model_type=%s\", model_type)\n\n\
+          \        # Set up MLForecast\n        allowed_date_features = [\"year\"\
+          , \"month\", \"week\", \"day\", \"dayofweek\", \"dayofyear\", \"quarter\"\
+          ]\n        parsed_date_features = [x for x in date_features if x in allowed_date_features]\n\
+          \n        fcst = MLForecast(\n            models={model_type: model},\n\
+          \            freq=forecast_freq,\n            lags=lags,\n            date_features=parsed_date_features,\n\
+          \            num_threads=1,\n        )\n\n        # Train/val split by series\n\
+          \        unique_ids = df[\"unique_id\"].unique()\n        train_df = df[df[\"\
+          unique_id\"].isin(unique_ids)]  # All for simplicity\n        valid_df =\
+          \ df[df[\"unique_id\"].isin(unique_ids)].tail(horizon * len(unique_ids))\n\
+          \n        logger.info(\"Training data: %d rows\", len(train_df))\n\n   \
+          \     # Fit model\n        fcst.fit(train_df)\n        logger.info(\"Model\
+          \ fitted successfully\")\n\n        # Generate predictions\n        Y_hat_df\
+          \ = fcst.predict(h=horizon)\n        logger.info(\"Predictions generated\
+          \ for horizon=%d\", horizon)\n\n        # Calculate metrics (WMAPE, MAE,\
+          \ RMSE)\n        def wmape(y_true, y_pred):\n            denominator = y_true.abs().sum()\n\
+          \            return (((y_true - y_pred).abs().sum() / denominator) * 100)\
+          \ if denominator > 0 else 0\n\n        if len(valid_df) > 0:\n         \
+          \   y_true = valid_df.set_index([\"unique_id\", \"ds\"])[\"y\"]\n      \
+          \      y_pred = Y_hat_df.set_index([\"unique_id\", \"ds\"])[model_type]\n\
+          \            metric_wmape = wmape(y_true, y_pred)\n            metric_mae\
+          \ = (y_true - y_pred).abs().mean()\n            metric_rmse = (((y_true\
+          \ - y_pred) ** 2).mean() ** 0.5)\n        else:\n            metric_wmape\
+          \ = metric_mae = metric_rmse = 0.0\n\n        logger.info(\"Metrics - WMAPE:\
+          \ %.4f, MAE: %.4f, RMSE: %.4f\", metric_wmape, metric_mae, metric_rmse)\n\
+          \n        # Save model artifact\n        model_dir = Path(\"/tmp/model_artifacts\"\
+          )\n        model_dir.mkdir(parents=True, exist_ok=True)\n        model_path\
+          \ = model_dir / f\"{model_type}_model.pkl\"\n        import pickle\n   \
+          \     with open(model_path, \"wb\") as f:\n            pickle.dump(fcst,\
+          \ f)\n        logger.info(\"Model saved to %s\", model_path)\n\n       \
+          \ # Upload to GCS\n        storage_client = storage.Client(project=project_id)\n\
+          \        bucket_name = f\"{project_id}-mlforecast-models\"\n        blob_path\
+          \ = f\"models/{model_display_name}/{model_type}/model.pkl\"\n        try:\n\
+          \            bucket = storage_client.bucket(bucket_name)\n            blob\
+          \ = bucket.blob(blob_path)\n            blob.upload_from_filename(model_path)\n\
+          \            model_uri = f\"gs://{bucket_name}/{blob_path}\"\n         \
+          \   logger.info(\"Model uploaded to %s\", model_uri)\n        except Exception\
+          \ as e:\n            logger.warning(\"Could not upload to GCS: %s, using\
+          \ local path\", str(e))\n            model_uri = str(model_path)\n\n   \
+          \     # Write predictions to BigQuery using the expected evaluation schema.\n\
+          \        predictions_table = prediction_bq_table\n        run_ts = pd.Timestamp.utcnow()\n\
+          \        prediction_df = Y_hat_df.rename(columns={model_type: \"prediction\"\
+          }).copy()\n        validation_cols = valid_df[[\"unique_id\", \"ds\", \"\
+          y\"]].copy() if len(valid_df) > 0 else df[[\"unique_id\", \"ds\", \"y\"\
+          ]].tail(len(prediction_df)).copy()\n        prediction_df = prediction_df.merge(validation_cols,\
+          \ on=[\"unique_id\", \"ds\"], how=\"left\")\n        prediction_df[\"run_ts\"\
+          ] = run_ts\n        prediction_df[\"model_display_name\"] = model_display_name\n\
+          \        prediction_df[\"model_type\"] = model_type\n        prediction_df[\"\
+          source_table\"] = bq_table\n        prediction_df[\"forecast_freq\"] = forecast_freq\n\
+          \        prediction_df[\"horizon\"] = horizon\n        prediction_df = prediction_df[[\n\
+          \            \"unique_id\",\n            \"ds\",\n            \"y\",\n \
+          \           \"prediction\",\n            \"run_ts\",\n            \"model_display_name\"\
+          ,\n            \"model_type\",\n            \"source_table\",\n        \
+          \    \"forecast_freq\",\n            \"horizon\",\n        ]]\n        prediction_df.to_gbq(predictions_table,\
+          \ project_id=project_id, if_exists=\"append\")\n        logger.info(\"Predictions\
+          \ written to BigQuery table: %s\", predictions_table)\n\n        # Build\
+          \ result metadata\n        metadata = {\n            \"model_type\": model_type,\n\
+          \            \"forecast_freq\": forecast_freq,\n            \"horizon\"\
+          : horizon,\n            \"lags\": lags,\n            \"date_features\":\
+          \ parsed_date_features,\n            \"train_rows\": int(len(train_df)),\n\
+          \            \"valid_rows\": int(len(valid_df)),\n            \"series_count\"\
+          : int(df[\"unique_id\"].nunique()),\n            \"rmse\": float(metric_rmse),\n\
+          \            \"mae\": float(metric_mae),\n            \"wmape\": float(metric_wmape),\n\
+          \            \"model_uri\": model_uri,\n            \"model_display_name\"\
+          : model_display_name,\n            \"source_table\": bq_table,\n       \
+          \     \"prediction_bq_table\": prediction_bq_table,\n        }\n\n     \
+          \   # Write metadata.json\n        with open(model_dir / \"metadata.json\"\
+          , \"w\", encoding=\"utf-8\") as f:\n            json.dump(metadata, f, indent=2)\n\
+          \n        logger.info(\"Training component completed successfully for model_type=%s\"\
+          , model_type)\n        return json.dumps(metadata)\n\n    except Exception\
+          \ as e:\n        logger.error(\"Error in training component: %s\", str(e),\
+          \ exc_info=True)\n        # Return minimal result on error\n        return\
+          \ json.dumps({\"model_type\": model_type, \"error\": str(e), \"wmape\":\
+          \ 999999.0})\n\n"
+        image: python:3.11
+    exec-train-single-model-component-5:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_single_model_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'numpy>=1.26.0' 'scikit-learn>=1.4.0' 'lightgbm>=4.3.0' 'xgboost>=2.0.0'\
+          \ 'mlforecast>=0.13.0' 'statsmodels>=0.14.0' 'arch>=6.0.0' 'statsforecast>=1.5.0'\
+          \ 'google-cloud-bigquery>=3.25.0' 'google-cloud-storage>=2.18.0' 'pandas-gbq>=0.28.0'\
+          \ 'pyarrow>=17.0.0' 'db-dtypes>=1.2.0'  &&  python3 -m pip install --quiet\
+          \ --no-warn-script-location 'kfp==2.16.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_single_model_component(\n    project_id: str,\n    bq_table:\
+          \ str,\n    prediction_bq_table: str,\n    forecast_freq: str,\n    horizon:\
+          \ int,\n    lags: list[int],\n    date_features: list[str],\n    model_display_name:\
+          \ str,\n    model_type: str,\n    model_artifact: Output[Model],\n    eval_metrics:\
+          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> str:\n\
+          \    \"\"\"Train a single model type and return metadata JSON.\"\"\"\n \
+          \   import json\n    import logging\n    from pathlib import Path\n\n  \
+          \  logging.basicConfig(\n        level=logging.INFO,\n        format=\"\
+          %(asctime)s | %(levelname)s | %(name)s | %(message)s\",\n    )\n    logger\
+          \ = logging.getLogger(\"train_single_model_component\")\n    logger.info(\"\
+          Starting training for model_type=%s\", model_type)\n\n    try:\n       \
+          \ import pandas as pd\n        import numpy as np\n        from sklearn.ensemble\
+          \ import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor\n\
+          \        from sklearn.linear_model import Ridge\n        from sklearn.svm\
+          \ import SVR\n        from lightgbm import LGBMRegressor\n        from xgboost\
+          \ import XGBRegressor\n        from mlforecast import MLForecast\n     \
+          \   from statsmodels.tsa.arima.model import ARIMA\n        from statsmodels.tsa.exponential_smoothing.ets\
+          \ import ExponentialSmoothing\n        from statsforecast.models import\
+          \ AutoARIMA, AutoETS, AutoTheta, IMAPA, ADIDA, CrostonClassic, CrostonOptimized,\
+          \ CrostonSBA, MSTL, AutoCES\n        from arch import arch_model\n     \
+          \   from google.cloud import bigquery, storage\n\n        # Initialize BigQuery\
+          \ client\n        bq_client = bigquery.Client(project=project_id)\n    \
+          \    logger.info(\"BigQuery client initialized for project=%s\", project_id)\n\
+          \n        # Load training data from BigQuery\n        query = f\"\"\"\n\
+          \        SELECT unique_id, ds, y\n        FROM `{project_id}.{bq_table}`\n\
+          \        ORDER BY unique_id, ds\n        \"\"\"\n        logger.info(\"\
+          Loading data from BigQuery table: %s\", bq_table)\n        df = bq_client.query(query).to_dataframe()\n\
+          \        df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n        logger.info(\"\
+          Loaded %d rows from BigQuery\", len(df))\n\n        # Prepare model based\
+          \ on type\n        if model_type == \"lgbm\":\n            model = LGBMRegressor(verbosity=-1,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"rf\":\n      \
+          \      model = RandomForestRegressor(n_estimators=100, random_state=0, n_jobs=1)\n\
+          \        elif model_type == \"et\":\n            model = ExtraTreesRegressor(n_estimators=100,\
+          \ random_state=0, n_jobs=1)\n        elif model_type == \"xgb\":\n     \
+          \       model = XGBRegressor(random_state=0, n_jobs=1)\n        elif model_type\
+          \ == \"gb\":\n            model = GradientBoostingRegressor(random_state=0)\n\
+          \        elif model_type == \"ridge\":\n            model = Ridge()\n  \
+          \      elif model_type == \"svr\":\n            model = SVR()\n        elif\
+          \ model_type == \"arima\":\n            model = AutoARIMA(season_length=12,\
+          \ trace=True)\n        elif model_type == \"ets\":\n            model =\
+          \ AutoETS(season_length=12, trace=True)\n        elif model_type == \"theta\"\
+          :\n            model = AutoTheta()\n        elif model_type == \"imapa\"\
+          :\n            model = IMAPA()\n        elif model_type == \"adida\":\n\
+          \            model = ADIDA()\n        elif model_type == \"croston\":\n\
+          \            model = CrostonClassic()\n        elif model_type == \"croston_optimized\"\
+          :\n            model = CrostonOptimized()\n        elif model_type == \"\
+          croston_sba\":\n            model = CrostonSBA()\n        elif model_type\
+          \ == \"mstl\":\n            model = MSTL(season_length=24)\n        elif\
+          \ model_type.startswith(\"garch_\"):\n            parts = model_type.split(\"\
+          _\")\n            p, q = int(parts[1]), int(parts[2])\n            model\
+          \ = arch_model(None, vol=\"Garch\", p=p, q=q)\n        elif model_type.startswith(\"\
+          arch_\"):\n            p = int(model_type.split(\"_\")[1])\n           \
+          \ model = arch_model(None, vol=\"ARCH\", p=p)\n        else:\n         \
+          \   raise ValueError(f\"Unsupported model_type: {model_type}\")\n\n    \
+          \    logger.info(\"Initialized model for model_type=%s\", model_type)\n\n\
+          \        # Set up MLForecast\n        allowed_date_features = [\"year\"\
+          , \"month\", \"week\", \"day\", \"dayofweek\", \"dayofyear\", \"quarter\"\
+          ]\n        parsed_date_features = [x for x in date_features if x in allowed_date_features]\n\
+          \n        fcst = MLForecast(\n            models={model_type: model},\n\
+          \            freq=forecast_freq,\n            lags=lags,\n            date_features=parsed_date_features,\n\
+          \            num_threads=1,\n        )\n\n        # Train/val split by series\n\
+          \        unique_ids = df[\"unique_id\"].unique()\n        train_df = df[df[\"\
+          unique_id\"].isin(unique_ids)]  # All for simplicity\n        valid_df =\
+          \ df[df[\"unique_id\"].isin(unique_ids)].tail(horizon * len(unique_ids))\n\
+          \n        logger.info(\"Training data: %d rows\", len(train_df))\n\n   \
+          \     # Fit model\n        fcst.fit(train_df)\n        logger.info(\"Model\
+          \ fitted successfully\")\n\n        # Generate predictions\n        Y_hat_df\
+          \ = fcst.predict(h=horizon)\n        logger.info(\"Predictions generated\
+          \ for horizon=%d\", horizon)\n\n        # Calculate metrics (WMAPE, MAE,\
+          \ RMSE)\n        def wmape(y_true, y_pred):\n            denominator = y_true.abs().sum()\n\
+          \            return (((y_true - y_pred).abs().sum() / denominator) * 100)\
+          \ if denominator > 0 else 0\n\n        if len(valid_df) > 0:\n         \
+          \   y_true = valid_df.set_index([\"unique_id\", \"ds\"])[\"y\"]\n      \
+          \      y_pred = Y_hat_df.set_index([\"unique_id\", \"ds\"])[model_type]\n\
+          \            metric_wmape = wmape(y_true, y_pred)\n            metric_mae\
+          \ = (y_true - y_pred).abs().mean()\n            metric_rmse = (((y_true\
+          \ - y_pred) ** 2).mean() ** 0.5)\n        else:\n            metric_wmape\
+          \ = metric_mae = metric_rmse = 0.0\n\n        logger.info(\"Metrics - WMAPE:\
+          \ %.4f, MAE: %.4f, RMSE: %.4f\", metric_wmape, metric_mae, metric_rmse)\n\
+          \n        # Save model artifact\n        model_dir = Path(\"/tmp/model_artifacts\"\
+          )\n        model_dir.mkdir(parents=True, exist_ok=True)\n        model_path\
+          \ = model_dir / f\"{model_type}_model.pkl\"\n        import pickle\n   \
+          \     with open(model_path, \"wb\") as f:\n            pickle.dump(fcst,\
+          \ f)\n        logger.info(\"Model saved to %s\", model_path)\n\n       \
+          \ # Upload to GCS\n        storage_client = storage.Client(project=project_id)\n\
+          \        bucket_name = f\"{project_id}-mlforecast-models\"\n        blob_path\
+          \ = f\"models/{model_display_name}/{model_type}/model.pkl\"\n        try:\n\
+          \            bucket = storage_client.bucket(bucket_name)\n            blob\
+          \ = bucket.blob(blob_path)\n            blob.upload_from_filename(model_path)\n\
+          \            model_uri = f\"gs://{bucket_name}/{blob_path}\"\n         \
+          \   logger.info(\"Model uploaded to %s\", model_uri)\n        except Exception\
+          \ as e:\n            logger.warning(\"Could not upload to GCS: %s, using\
+          \ local path\", str(e))\n            model_uri = str(model_path)\n\n   \
+          \     # Write predictions to BigQuery using the expected evaluation schema.\n\
+          \        predictions_table = prediction_bq_table\n        run_ts = pd.Timestamp.utcnow()\n\
+          \        prediction_df = Y_hat_df.rename(columns={model_type: \"prediction\"\
+          }).copy()\n        validation_cols = valid_df[[\"unique_id\", \"ds\", \"\
+          y\"]].copy() if len(valid_df) > 0 else df[[\"unique_id\", \"ds\", \"y\"\
+          ]].tail(len(prediction_df)).copy()\n        prediction_df = prediction_df.merge(validation_cols,\
+          \ on=[\"unique_id\", \"ds\"], how=\"left\")\n        prediction_df[\"run_ts\"\
+          ] = run_ts\n        prediction_df[\"model_display_name\"] = model_display_name\n\
+          \        prediction_df[\"model_type\"] = model_type\n        prediction_df[\"\
+          source_table\"] = bq_table\n        prediction_df[\"forecast_freq\"] = forecast_freq\n\
+          \        prediction_df[\"horizon\"] = horizon\n        prediction_df = prediction_df[[\n\
+          \            \"unique_id\",\n            \"ds\",\n            \"y\",\n \
+          \           \"prediction\",\n            \"run_ts\",\n            \"model_display_name\"\
+          ,\n            \"model_type\",\n            \"source_table\",\n        \
+          \    \"forecast_freq\",\n            \"horizon\",\n        ]]\n        prediction_df.to_gbq(predictions_table,\
+          \ project_id=project_id, if_exists=\"append\")\n        logger.info(\"Predictions\
+          \ written to BigQuery table: %s\", predictions_table)\n\n        # Build\
+          \ result metadata\n        metadata = {\n            \"model_type\": model_type,\n\
+          \            \"forecast_freq\": forecast_freq,\n            \"horizon\"\
+          : horizon,\n            \"lags\": lags,\n            \"date_features\":\
+          \ parsed_date_features,\n            \"train_rows\": int(len(train_df)),\n\
+          \            \"valid_rows\": int(len(valid_df)),\n            \"series_count\"\
+          : int(df[\"unique_id\"].nunique()),\n            \"rmse\": float(metric_rmse),\n\
+          \            \"mae\": float(metric_mae),\n            \"wmape\": float(metric_wmape),\n\
+          \            \"model_uri\": model_uri,\n            \"model_display_name\"\
+          : model_display_name,\n            \"source_table\": bq_table,\n       \
+          \     \"prediction_bq_table\": prediction_bq_table,\n        }\n\n     \
+          \   # Write metadata.json\n        with open(model_dir / \"metadata.json\"\
+          , \"w\", encoding=\"utf-8\") as f:\n            json.dump(metadata, f, indent=2)\n\
+          \n        logger.info(\"Training component completed successfully for model_type=%s\"\
+          , model_type)\n        return json.dumps(metadata)\n\n    except Exception\
+          \ as e:\n        logger.error(\"Error in training component: %s\", str(e),\
+          \ exc_info=True)\n        # Return minimal result on error\n        return\
+          \ json.dumps({\"model_type\": model_type, \"error\": str(e), \"wmape\":\
+          \ 999999.0})\n\n"
+        image: python:3.11
+pipelineInfo:
+  description: MLForecast fan-out pipeline with 5 static training tasks
+  name: nixtla-mlforecast-simple-fanout-pipeline
+root:
+  dag:
+    tasks:
+      aggregate-training-results-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-aggregate-training-results-component
+        dependentTasks:
+        - train-single-model-component
+        - train-single-model-component-2
+        - train-single-model-component-3
+        - train-single-model-component-4
+        - train-single-model-component-5
+        inputs:
+          parameters:
+            result1:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-single-model-component
+            result2:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-single-model-component-2
+            result3:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-single-model-component-3
+            result4:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-single-model-component-4
+            result5:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-single-model-component-5
+        taskInfo:
+          name: aggregate-training-results
+      batch-forecast-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-batch-forecast-component
+        dependentTasks:
+        - register-and-deploy-champion-component
+        - select-champion-component
+        inputs:
+          parameters:
+            batch_forecast_bq_table:
+              componentInputParameter: batch_forecast_bq_table
+            bq_table:
+              componentInputParameter: bq_table
+            champion_result:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: select-champion-component
+            date_features:
+              componentInputParameter: date_features
+            forecast_freq:
+              componentInputParameter: forecast_freq
+            horizon:
+              componentInputParameter: horizon
+            lags:
+              componentInputParameter: lags
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: batch-forecast
+      register-and-deploy-champion-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-register-and-deploy-champion-component
+        dependentTasks:
+        - select-champion-component
+        inputs:
+          parameters:
+            champion_result:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: select-champion-component
+            endpoint_display_name:
+              componentInputParameter: endpoint_display_name
+            project_id:
+              componentInputParameter: project_id
+            region:
+              componentInputParameter: region
+        taskInfo:
+          name: register-deploy-champion
+      select-champion-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-select-champion-component
+        dependentTasks:
+        - aggregate-training-results-component
+        inputs:
+          parameters:
+            champion_bq_table:
+              componentInputParameter: champion_bq_table
+            metric_name:
+              componentInputParameter: champion_metric
+            project_id:
+              componentInputParameter: project_id
+            training_results_json:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: aggregate-training-results-component
+        taskInfo:
+          name: select-champion
+      train-single-model-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-single-model-component
+        inputs:
+          parameters:
+            bq_table:
+              componentInputParameter: bq_table
+            date_features:
+              componentInputParameter: date_features
+            forecast_freq:
+              componentInputParameter: forecast_freq
+            horizon:
+              componentInputParameter: horizon
+            lags:
+              componentInputParameter: lags
+            model_display_name:
+              componentInputParameter: model_display_name
+            model_type:
+              runtimeValue:
+                constant: lgbm
+            prediction_bq_table:
+              componentInputParameter: prediction_bq_table
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: train-lgbm
+      train-single-model-component-2:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-single-model-component-2
+        inputs:
+          parameters:
+            bq_table:
+              componentInputParameter: bq_table
+            date_features:
+              componentInputParameter: date_features
+            forecast_freq:
+              componentInputParameter: forecast_freq
+            horizon:
+              componentInputParameter: horizon
+            lags:
+              componentInputParameter: lags
+            model_display_name:
+              componentInputParameter: model_display_name
+            model_type:
+              runtimeValue:
+                constant: xgb
+            prediction_bq_table:
+              componentInputParameter: prediction_bq_table
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: train-xgb
+      train-single-model-component-3:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-single-model-component-3
+        inputs:
+          parameters:
+            bq_table:
+              componentInputParameter: bq_table
+            date_features:
+              componentInputParameter: date_features
+            forecast_freq:
+              componentInputParameter: forecast_freq
+            horizon:
+              componentInputParameter: horizon
+            lags:
+              componentInputParameter: lags
+            model_display_name:
+              componentInputParameter: model_display_name
+            model_type:
+              runtimeValue:
+                constant: rf
+            prediction_bq_table:
+              componentInputParameter: prediction_bq_table
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: train-rf
+      train-single-model-component-4:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-single-model-component-4
+        inputs:
+          parameters:
+            bq_table:
+              componentInputParameter: bq_table
+            date_features:
+              componentInputParameter: date_features
+            forecast_freq:
+              componentInputParameter: forecast_freq
+            horizon:
+              componentInputParameter: horizon
+            lags:
+              componentInputParameter: lags
+            model_display_name:
+              componentInputParameter: model_display_name
+            model_type:
+              runtimeValue:
+                constant: et
+            prediction_bq_table:
+              componentInputParameter: prediction_bq_table
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: train-et
+      train-single-model-component-5:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-single-model-component-5
+        inputs:
+          parameters:
+            bq_table:
+              componentInputParameter: bq_table
+            date_features:
+              componentInputParameter: date_features
+            forecast_freq:
+              componentInputParameter: forecast_freq
+            horizon:
+              componentInputParameter: horizon
+            lags:
+              componentInputParameter: lags
+            model_display_name:
+              componentInputParameter: model_display_name
+            model_type:
+              runtimeValue:
+                constant: ridge
+            prediction_bq_table:
+              componentInputParameter: prediction_bq_table
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: train-ridge
+  inputDefinitions:
+    parameters:
+      batch_forecast_bq_table:
+        defaultValue: forecasting.sales_batch_forecasts
+        isOptional: true
+        parameterType: STRING
+      bq_table:
+        defaultValue: forecasting.sales_daily
+        isOptional: true
+        parameterType: STRING
+      champion_bq_table:
+        defaultValue: forecasting.sales_champion
+        isOptional: true
+        parameterType: STRING
+      champion_metric:
+        defaultValue: wmape
+        isOptional: true
+        parameterType: STRING
+      date_features:
+        defaultValue:
+        - dayofweek
+        - month
+        isOptional: true
+        parameterType: LIST
+      endpoint_display_name:
+        defaultValue: mlforecast-champion-endpoint
+        isOptional: true
+        parameterType: STRING
+      forecast_freq:
+        defaultValue: D
+        isOptional: true
+        parameterType: STRING
+      horizon:
+        defaultValue: 2.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      lags:
+        defaultValue:
+        - 1.0
+        - 2.0
+        - 3.0
+        isOptional: true
+        parameterType: LIST
+      model_display_name:
+        defaultValue: mlforecast
+        isOptional: true
+        parameterType: STRING
+      prediction_bq_table:
+        defaultValue: forecasting.sales_predictions
+        isOptional: true
+        parameterType: STRING
+      project_id:
+        defaultValue: dazzling-seat-366014
+        isOptional: true
+        parameterType: STRING
+      region:
+        defaultValue: us-central1
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.16.0

@@ -764,6 +764,88 @@ def mlforecast_parallel_pipeline(
             t.outputs["Output"] for t in training_tasks.values()
         ]) if len(model_types) > 1 else training_tasks[model_types[0]].outputs["Output"],
         metric_name=champion_metric,
+    # FAN-OUT: Create 5 fixed training tasks for the default model types
+    # KFP requires fully static DAG definition at graph time, so we create
+    # explicit tasks instead of dynamic loops. The component logic supports 30+ model types.
+    lgbm_task = train_single_model_component(
+        project_id=project_id,
+        bq_table=bq_table,
+        prediction_bq_table=prediction_bq_table,
+        forecast_freq=forecast_freq,
+        horizon=horizon,
+        lags=lags,
+        date_features=date_features,
+        model_display_name=model_display_name,
+        model_type="lgbm",
+    )
+    lgbm_task.set_display_name("train-lgbm")
+
+    xgb_task = train_single_model_component(
+        project_id=project_id,
+        bq_table=bq_table,
+        prediction_bq_table=prediction_bq_table,
+        forecast_freq=forecast_freq,
+        horizon=horizon,
+        lags=lags,
+        date_features=date_features,
+        model_display_name=model_display_name,
+        model_type="xgb",
+    )
+    xgb_task.set_display_name("train-xgb")
+
+    arima_task = train_single_model_component(
+        project_id=project_id,
+        bq_table=bq_table,
+        prediction_bq_table=prediction_bq_table,
+        forecast_freq=forecast_freq,
+        horizon=horizon,
+        lags=lags,
+        date_features=date_features,
+        model_display_name=model_display_name,
+        model_type="arima",
+    )
+    arima_task.set_display_name("train-arima")
+
+    ets_task = train_single_model_component(
+        project_id=project_id,
+        bq_table=bq_table,
+        prediction_bq_table=prediction_bq_table,
+        forecast_freq=forecast_freq,
+        horizon=horizon,
+        lags=lags,
+        date_features=date_features,
+        model_display_name=model_display_name,
+        model_type="ets",
+    )
+    ets_task.set_display_name("train-ets")
+
+    theta_task = train_single_model_component(
+        project_id=project_id,
+        bq_table=bq_table,
+        prediction_bq_table=prediction_bq_table,
+        forecast_freq=forecast_freq,
+        horizon=horizon,
+        lags=lags,
+        date_features=date_features,
+        model_display_name=model_display_name,
+        model_type="theta",
+    )
+    theta_task.set_display_name("train-theta")
+
+    # FAN-IN: Pass all results to champion selector
+    # The component will parse JSON and select the best model by metric
+    champion_task = select_champion_component(
+        project_id=project_id,
+        champion_bq_table=champion_bq_table,
+        # Pass all training results - in actual execution, KFP will read these from artifacts
+        training_results_json=dsl.concatenate_files([
+            lgbm_task.outputs["Output"],
+            xgb_task.outputs["Output"],
+            arima_task.outputs["Output"],
+            ets_task.outputs["Output"],
+            theta_task.outputs["Output"],
+        ]),
+        metric_name=champion_metric,
     )
     champion_task.set_display_name("select-champion")
 
