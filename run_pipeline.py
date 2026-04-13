@@ -24,7 +24,7 @@ PARAMETER_VALUES = {
     "prediction_bq_table": "dazzling-seat-366014.forecasting.sales_predictions",
     "champion_bq_table": "dazzling-seat-366014.forecasting.sales_champion",
     "batch_forecast_bq_table": "dazzling-seat-366014.forecasting.sales_batch_forecasts",
-    "model_types": ["lgbm", "rf", "et"],  # Customizable for fan-out mode
+    "model_types": ["lgbm", "rf", "et", "xgb", "gb"],  # Customizable: add/remove models here
     "region": REGION,
     "endpoint_display_name": "mlforecast-champion-endpoint",
     "forecast_freq": "D",

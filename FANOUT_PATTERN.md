@@ -111,16 +111,39 @@ Edit [run_pipeline.py](run_pipeline.py#L27) and change the `model_types` list:
 ```python
 PARAMETER_VALUES = {
     ...
-    "model_types": ["lgbm", "rf", "et", "xgb"],  # Add more models!
+    "model_types": ["lgbm", "rf", "et", "xgb", "gb", "ridge", "svr"],  # Mix and match!
     ...
 }
 ```
 
-Supported models (defined in [train_single_model_component](pipeline_mlforecast_fanout.py#L73)):
-- `lgbm` - LightGBM Regressor
-- `rf` - Random Forest Regressor
-- `et` - Extra Trees Regressor
-- (extend with more in component logic)
+**Available Models**:
+
+| Model Code | Model Name | Best For | Hyperparameters |
+|-----------|-----------|----------|-----------------|
+| `lgbm` | LightGBM | Fast gradient boosting | n_est=300, lr=0.05, leaves=64 |
+| `rf` | Random Forest | Baseline ensemble | n_est=300, depth=10 |
+| `et` | Extra Trees | Fast ensemble | n_est=300, depth=10 |
+| `xgb` | XGBoost | High-performance boosting | n_est=300, lr=0.05, depth=6 |
+| `gb` | Gradient Boosting | Stable boosting | n_est=300, lr=0.05, depth=5 |
+| `ridge` | Ridge Regression | Linear + L2 regularization | alpha=1.0 |
+| `svr` | Support Vector Regressor | Non-linear patterns | kernel=rbf, C=100 |
+
+**Example Combinations**:
+
+Lightweight (fast training):
+```python
+"model_types": ["rf", "ridge", "lgbm"]
+```
+
+Comprehensive comparison (all models):
+```python
+"model_types": ["lgbm", "rf", "et", "xgb", "gb", "ridge", "svr"]
+```
+
+Production (proven winners):
+```python
+"model_types": ["lgbm", "xgb", "rf"]
+```
 
 ---
 
@@ -196,14 +219,61 @@ After submission:
 
 ## Next Steps
 
-To add more model types:
+### To Add More Custom Models
 
-1. **Extend** [train_single_model_component](pipeline_mlforecast_fanout.py#L73) with new `elif model_type == "xgb":` branches
-2. **Update** [setup_bq_tables.py](setup_bq_tables.py) if schema changes
-3. **Run**:
+If you want to add additional models beyond the 7 supported ones:
+
+1. **Install the package** in [pipeline_mlforecast_fanout.py](pipeline_mlforecast_fanout.py#L12):
+   ```python
+   packages_to_install=[
+       ...
+       "catboost>=1.2.0",  # Example: CatBoost
+   ],
+   ```
+
+2. **Import the model** in [train_single_model_component](pipeline_mlforecast_fanout.py#L51):
+   ```python
+   from catboost import CatBoostRegressor
+   ```
+
+3. **Add model logic** in the `if/elif` chain ([pipeline_mlforecast_fanout.py](pipeline_mlforecast_fanout.py#L118)):
+   ```python
+   elif model_type == "catboost":
+       model = CatBoostRegressor(
+           iterations=300,
+           learning_rate=0.05,
+           depth=5,
+           random_state=42,
+           verbose=False,
+       )
+   ```
+
+4. **Update the error message** to include the new model code
+
+5. **Run**:
    ```bash
    python3 pipeline_mlforecast_fanout.py
    python3 run_pipeline.py fanout
    ```
 
-Done! No other changes needed.
+6. **Use in your run**:
+   ```python
+   PARAMETER_VALUES = {
+       ...
+       "model_types": ["lgbm", "xgb", "catboost"],  # Your new model!
+       ...
+   }
+   ```
+
+---
+
+## Existing Model Support
+
+To add existing scikit-learn or tree-based models (CatBoost, NGBoost, Hist Gradient Boosting, etc.):
+
+1. Install the package
+2. Import it
+3. Add the conditional branch
+4. Done!
+
+All metrics (RMSE, MAE, WMAPE) are computed the same way for any model type.

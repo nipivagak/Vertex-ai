@@ -19,6 +19,7 @@ from kfp.dsl import Output, Model, Metrics, Artifact
         "numpy>=1.26.0",
         "scikit-learn>=1.4.0",
         "lightgbm>=4.3.0",
+        "xgboost>=2.0.0",
         "mlforecast>=0.13.0",
         "google-cloud-bigquery>=3.25.0",
         "google-cloud-storage>=2.18.0",
@@ -49,7 +50,10 @@ def train_single_model_component(
     from google.cloud import bigquery
     from lightgbm import LGBMRegressor
     from mlforecast import MLForecast
-    from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
+    from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor
+    from sklearn.linear_model import Ridge
+    from sklearn.svm import SVR
+    from xgboost import XGBRegressor
 
     logging.basicConfig(
         level=logging.INFO,
@@ -139,8 +143,42 @@ def train_single_model_component(
             n_jobs=-1,
             random_state=42,
         )
+    elif model_type == "xgb":
+        model = XGBRegressor(
+            n_estimators=300,
+            learning_rate=0.05,
+            max_depth=6,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=42,
+            verbosity=0,
+            tree_method="hist",
+        )
+    elif model_type == "gb":
+        model = GradientBoostingRegressor(
+            n_estimators=300,
+            learning_rate=0.05,
+            max_depth=5,
+            min_samples_leaf=2,
+            subsample=0.8,
+            random_state=42,
+        )
+    elif model_type == "ridge":
+        model = Ridge(
+            alpha=1.0,
+            random_state=42,
+        )
+    elif model_type == "svr":
+        model = SVR(
+            kernel="rbf",
+            C=100,
+            epsilon=0.1,
+        )
     else:
-        raise ValueError(f"Unsupported model_type: {model_type}")
+        raise ValueError(
+            f"Unsupported model_type: {model_type}. "
+            "Supported: lgbm, rf, et, xgb, gb, ridge, svr"
+        )
 
     logger.info("Initialized model for model_type=%s", model_type)
 
@@ -615,7 +653,7 @@ def mlforecast_parallel_pipeline(
     prediction_bq_table: str,
     champion_bq_table: str,
     batch_forecast_bq_table: str,
-    model_types: list[str] = ["lgbm", "rf", "et"],
+    model_types: list[str] = ["lgbm", "rf", "et", "xgb"],
     forecast_freq: str = "D",
     horizon: int = 2,
     lags: list[int] = [1, 2, 3],
