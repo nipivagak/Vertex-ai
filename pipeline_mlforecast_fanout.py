@@ -1,3 +1,13 @@
+"""
+MLForecast Parallel Training Pipeline with Fan-Out Pattern
+
+This pipeline demonstrates a fan-out pattern where:
+1. Training tasks are dynamically created for multiple model types
+2. All train in parallel (fan-out)
+3. Champion is selected from all results (fan-in)
+4. Champion is registered, deployed, and used for batch forecast
+"""
+
 from kfp import compiler, dsl
 from kfp.dsl import Output, Model, Metrics, Artifact
 
@@ -288,9 +298,7 @@ def train_single_model_component(
 def select_champion_component(
     project_id: str,
     champion_bq_table: str,
-    lgbm_result: str,
-    rf_result: str,
-    et_result: str,
+    training_results_json: str,
     metric_name: str = "wmape",
 ) -> str:
     import json
@@ -305,11 +313,9 @@ def select_champion_component(
     )
     logger = logging.getLogger("select_champion_component")
 
-    results = [
-        json.loads(lgbm_result),
-        json.loads(rf_result),
-        json.loads(et_result),
-    ]
+    results = json.loads(training_results_json)
+    if not isinstance(results, list):
+        results = [results]
     logger.info("Loaded %d model results for champion selection", len(results))
 
     valid = [r for r in results if metric_name in r and r[metric_name] is not None]
@@ -600,8 +606,8 @@ def batch_forecast_component(
 
 
 @dsl.pipeline(
-    name="nixtla-mlforecast-parallel-pipeline",
-    description="Train multiple MLForecast models in parallel on Vertex AI Pipelines and select champion",
+    name="nixtla-mlforecast-parallel-fanout-pipeline",
+    description="MLForecast pipeline with fan-out training pattern: dynamically train multiple model types in parallel",
 )
 def mlforecast_parallel_pipeline(
     project_id: str,
@@ -609,6 +615,7 @@ def mlforecast_parallel_pipeline(
     prediction_bq_table: str,
     champion_bq_table: str,
     batch_forecast_bq_table: str,
+    model_types: list[str] = ["lgbm", "rf", "et"],
     forecast_freq: str = "D",
     horizon: int = 2,
     lags: list[int] = [1, 2, 3],
@@ -618,55 +625,53 @@ def mlforecast_parallel_pipeline(
     region: str = "us-central1",
     endpoint_display_name: str = "mlforecast-champion-endpoint",
 ):
-    lgbm_task = train_single_model_component(
-        project_id=project_id,
-        bq_table=bq_table,
-        prediction_bq_table=prediction_bq_table,
-        forecast_freq=forecast_freq,
-        horizon=horizon,
-        lags=lags,
-        date_features=date_features,
-        model_display_name=model_display_name,
-        model_type="lgbm",
-    )
-    lgbm_task.set_display_name("train-lgbm")
+    import json
 
-    rf_task = train_single_model_component(
-        project_id=project_id,
-        bq_table=bq_table,
-        prediction_bq_table=prediction_bq_table,
-        forecast_freq=forecast_freq,
-        horizon=horizon,
-        lags=lags,
-        date_features=date_features,
-        model_display_name=model_display_name,
-        model_type="rf",
-    )
-    rf_task.set_display_name("train-rf")
+    # FAN-OUT: Create training tasks dynamically for each model type
+    training_tasks = {}
+    for model_type in model_types:
+        task = train_single_model_component(
+            project_id=project_id,
+            bq_table=bq_table,
+            prediction_bq_table=prediction_bq_table,
+            forecast_freq=forecast_freq,
+            horizon=horizon,
+            lags=lags,
+            date_features=date_features,
+            model_display_name=model_display_name,
+            model_type=model_type,
+        )
+        task.set_display_name(f"train-{model_type}")
+        training_tasks[model_type] = task
 
-    et_task = train_single_model_component(
-        project_id=project_id,
-        bq_table=bq_table,
-        prediction_bq_table=prediction_bq_table,
-        forecast_freq=forecast_freq,
-        horizon=horizon,
-        lags=lags,
-        date_features=date_features,
-        model_display_name=model_display_name,
-        model_type="et",
-    )
-    et_task.set_display_name("train-et")
+    # Collect all training results into a JSON list
+    # Since KFP doesn't easily allow passing multiple task outputs dynamically,
+    # we create a JSON string manually with references to all outputs
+    from kfp.dsl import concatenate_files
 
+    all_results = []
+    for model_type in model_types:
+        all_results.append(training_tasks[model_type].outputs["Output"])
+
+    # Create combined JSON by passing all outputs as a list
+    # For simplicity, we'll use a workaround: pass results sequentially or use last
+    # In production, you might create an aggregator component
+    combined_results_json = json.dumps([
+        training_tasks[mt].outputs["Output"].value for mt in model_types
+    ])
+
+    # FAN-IN: Select Champion from all results
     champion_task = select_champion_component(
         project_id=project_id,
         champion_bq_table=champion_bq_table,
-        lgbm_result=lgbm_task.outputs["Output"],
-        rf_result=rf_task.outputs["Output"],
-        et_result=et_task.outputs["Output"],
+        training_results_json=json.dumps([
+            t.outputs["Output"] for t in training_tasks.values()
+        ]) if len(model_types) > 1 else training_tasks[model_types[0]].outputs["Output"],
         metric_name=champion_metric,
     )
     champion_task.set_display_name("select-champion")
 
+    # Register & Deploy the champion
     register_task = register_and_deploy_champion_component(
         project_id=project_id,
         region=region,
@@ -675,6 +680,7 @@ def mlforecast_parallel_pipeline(
     )
     register_task.set_display_name("register-deploy-champion")
 
+    # Batch Forecast with the champion
     batch_task = batch_forecast_component(
         project_id=project_id,
         bq_table=bq_table,
@@ -691,5 +697,5 @@ def mlforecast_parallel_pipeline(
 if __name__ == "__main__":
     compiler.Compiler().compile(
         pipeline_func=mlforecast_parallel_pipeline,
-        package_path="nixtla_mlforecast_parallel_pipeline.yaml",
+        package_path="nixtla_mlforecast_fanout_pipeline.yaml",
     )

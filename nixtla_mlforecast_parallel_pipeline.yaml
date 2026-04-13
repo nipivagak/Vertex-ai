@@ -2,17 +2,60 @@
 # Name: nixtla-mlforecast-parallel-pipeline
 # Description: Train multiple MLForecast models in parallel on Vertex AI Pipelines and select champion
 # Inputs:
+#    batch_forecast_bq_table: str
 #    bq_table: str
 #    champion_bq_table: str
 #    champion_metric: str [Default: 'wmape']
 #    date_features: list [Default: ['dayofweek', 'month']]
+#    endpoint_display_name: str [Default: 'mlforecast-champion-endpoint']
 #    forecast_freq: str [Default: 'D']
 #    horizon: int [Default: 2.0]
 #    lags: list [Default: [1.0, 2.0, 3.0]]
 #    model_display_name: str [Default: 'mlforecast']
 #    prediction_bq_table: str
 #    project_id: str
+#    region: str [Default: 'us-central1']
 components:
+  comp-batch-forecast-component:
+    executorLabel: exec-batch-forecast-component
+    inputDefinitions:
+      parameters:
+        batch_forecast_bq_table:
+          parameterType: STRING
+        bq_table:
+          parameterType: STRING
+        champion_result:
+          parameterType: STRING
+        date_features:
+          parameterType: LIST
+        forecast_freq:
+          parameterType: STRING
+        horizon:
+          parameterType: NUMBER_INTEGER
+        lags:
+          parameterType: LIST
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-register-and-deploy-champion-component:
+    executorLabel: exec-register-and-deploy-champion-component
+    inputDefinitions:
+      parameters:
+        champion_result:
+          parameterType: STRING
+        endpoint_display_name:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        region:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
   comp-select-champion-component:
     executorLabel: exec-select-champion-component
     inputDefinitions:
@@ -154,6 +197,169 @@ components:
           parameterType: STRING
 deploymentSpec:
   executors:
+    exec-batch-forecast-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - batch_forecast_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'numpy>=1.26.0' 'mlforecast>=0.13.0' 'lightgbm>=4.3.0' 'scikit-learn>=1.4.0'\
+          \ 'google-cloud-bigquery>=3.25.0' 'google-cloud-storage>=2.18.0' 'pyarrow>=17.0.0'\
+          \ 'db-dtypes>=1.2.0'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.16.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef batch_forecast_component(\n    project_id: str,\n    bq_table:\
+          \ str,\n    batch_forecast_bq_table: str,\n    forecast_freq: str,\n   \
+          \ horizon: int,\n    lags: list[int],\n    date_features: list[str],\n \
+          \   champion_result: str,\n) -> str:\n    import json\n    import logging\n\
+          \    import tempfile\n    from pathlib import Path\n\n    import pandas\
+          \ as pd\n    from google.cloud import bigquery, storage\n    from mlforecast\
+          \ import MLForecast\n\n    logging.basicConfig(\n        level=logging.INFO,\n\
+          \        format=\"%(asctime)s | %(levelname)s | %(name)s | %(message)s\"\
+          ,\n    )\n    logger = logging.getLogger(\"batch_forecast_component\")\n\
+          \n    summary = json.loads(champion_result)\n    model_uri = summary[\"\
+          champion_model_uri\"]\n    model_type = summary[\"champion_model_type\"\
+          ]\n\n    logger.info(\n        \"Batch forecast using champion model_type=%s\
+          \ uri=%s\", model_type, model_uri\n    )\n\n    assert model_uri.startswith(\"\
+          gs://\"), f\"Expected gs:// URI, got: {model_uri}\"\n    without_scheme\
+          \ = model_uri[5:]\n    bucket_name, _, prefix = without_scheme.partition(\"\
+          /\")\n    prefix = prefix.rstrip(\"/\") + \"/\"\n\n    storage_client =\
+          \ storage.Client(project=project_id)\n    blobs = list(storage_client.list_blobs(bucket_name,\
+          \ prefix=prefix))\n    logger.info(\"Downloading %d model files from %s\"\
+          , len(blobs), model_uri)\n\n    with tempfile.TemporaryDirectory() as tmpdir:\n\
+          \        local_model_dir = Path(tmpdir) / \"model\"\n        local_model_dir.mkdir(parents=True)\n\
+          \n        for blob in blobs:\n            relative = blob.name[len(prefix):]\n\
+          \            if not relative:\n                continue\n            dest\
+          \ = local_model_dir / relative\n            dest.parent.mkdir(parents=True,\
+          \ exist_ok=True)\n            blob.download_to_filename(str(dest))\n\n \
+          \       fcst = MLForecast.load(local_model_dir)\n        logger.info(\"\
+          Loaded MLForecast model from GCS\")\n\n        bq_client = bigquery.Client(project=project_id)\n\
+          \        max_lag = max(lags) if lags else 1\n        window = max_lag +\
+          \ horizon\n\n        query = f\"\"\"\n            WITH ranked AS (\n   \
+          \             SELECT unique_id, ds, y,\n                    ROW_NUMBER()\
+          \ OVER (PARTITION BY unique_id ORDER BY ds DESC) AS rn\n               \
+          \ FROM `{bq_table}`\n                WHERE unique_id IS NOT NULL\n     \
+          \             AND ds IS NOT NULL\n                  AND y IS NOT NULL\n\
+          \            )\n            SELECT unique_id, ds, y\n            FROM ranked\n\
+          \            WHERE rn <= {window}\n            ORDER BY unique_id, ds\n\
+          \        \"\"\"\n        df = bq_client.query(query).to_dataframe()\n  \
+          \      logger.info(\"Fetched %d rows for scoring window from BigQuery\"\
+          , len(df))\n\n        df[\"unique_id\"] = df[\"unique_id\"].astype(str)\n\
+          \        df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n        df[\"y\"] = pd.to_numeric(df[\"\
+          y\"], errors=\"coerce\")\n        df = df.dropna(subset=[\"unique_id\",\
+          \ \"ds\", \"y\"])\n\n        try:\n            preds = fcst.predict(h=horizon,\
+          \ new_df=df)\n            logger.info(\"Predicted using latest BQ window\
+          \ (new_df)\")\n        except Exception as exc:\n            logger.warning(\n\
+          \                \"predict with new_df failed (%s); falling back to training\
+          \ window\", exc\n            )\n            preds = fcst.predict(h=horizon)\n\
+          \n        logger.info(\n            \"Generated %d future forecast rows\
+          \ for horizon=%d\", len(preds), horizon\n        )\n\n        if model_type\
+          \ not in preds.columns:\n            raise ValueError(\n               \
+          \ f\"Expected column '{model_type}'. Got: {preds.columns.tolist()}\"\n \
+          \           )\n\n        preds = preds.rename(columns={model_type: \"prediction\"\
+          })\n        preds[\"run_ts\"] = pd.Timestamp.utcnow()\n        preds[\"\
+          model_type\"] = model_type\n        preds[\"source_table\"] = bq_table\n\
+          \        preds[\"forecast_freq\"] = forecast_freq\n        preds[\"horizon\"\
+          ] = horizon\n        preds[\"is_future\"] = True\n\n        job_config =\
+          \ bigquery.LoadJobConfig(write_disposition=\"WRITE_APPEND\")\n        bq_client.load_table_from_dataframe(\n\
+          \            preds[[\n                \"unique_id\", \"ds\", \"prediction\"\
+          , \"run_ts\", \"model_type\",\n                \"source_table\", \"forecast_freq\"\
+          , \"horizon\", \"is_future\",\n            ]],\n            batch_forecast_bq_table,\n\
+          \            job_config=job_config,\n        ).result()\n        logger.info(\n\
+          \            \"Wrote %d batch forecast rows to %s\", len(preds), batch_forecast_bq_table\n\
+          \        )\n\n        result = {\n            \"batch_forecast_table\":\
+          \ batch_forecast_bq_table,\n            \"forecast_rows\": len(preds),\n\
+          \            \"model_type\": model_type,\n            \"horizon\": horizon,\n\
+          \        }\n        logger.info(\"Batch forecast complete: %s\", result)\n\
+          \        return json.dumps(result)\n\n"
+        image: python:3.11
+    exec-register-and-deploy-champion-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - register_and_deploy_champion_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform>=1.50.0'\
+          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef register_and_deploy_champion_component(\n    project_id: str,\n\
+          \    region: str,\n    champion_result: str,\n    endpoint_display_name:\
+          \ str,\n) -> str:\n    import json\n    import logging\n\n    from google.cloud\
+          \ import aiplatform\n\n    logging.basicConfig(\n        level=logging.INFO,\n\
+          \        format=\"%(asctime)s | %(levelname)s | %(name)s | %(message)s\"\
+          ,\n    )\n    logger = logging.getLogger(\"register_and_deploy_champion_component\"\
+          )\n\n    summary = json.loads(champion_result)\n    model_uri = summary[\"\
+          champion_model_uri\"]\n    model_type = summary[\"champion_model_type\"\
+          ]\n    display_name = summary.get(\"model_display_name\") or f\"mlforecast-{model_type}\"\
+          \n\n    logger.info(\n        \"Registering champion model_type=%s from\
+          \ uri=%s\", model_type, model_uri\n    )\n    aiplatform.init(project=project_id,\
+          \ location=region)\n\n    model = aiplatform.Model.upload(\n        display_name=display_name,\n\
+          \        artifact_uri=model_uri,\n        serving_container_image_uri=(\n\
+          \            \"us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-5:latest\"\
+          \n        ),\n        description=(\n            f\"MLForecast champion\
+          \ model: {model_type}. \"\n            \"NOTE: Online serving requires a\
+          \ custom prediction container \"\n            \"matching the MLForecast\
+          \ save format. Use batch_forecast_component for scoring.\"\n        ),\n\
+          \    )\n    logger.info(\"Registered model in Vertex AI Model Registry:\
+          \ %s\", model.resource_name)\n\n    existing = aiplatform.Endpoint.list(\n\
+          \        filter=f'display_name=\"{endpoint_display_name}\"',\n        project=project_id,\n\
+          \        location=region,\n    )\n    if existing:\n        endpoint = existing[0]\n\
+          \        logger.info(\"Reusing existing endpoint: %s\", endpoint.resource_name)\n\
+          \        for dm in endpoint.list_models():\n            logger.info(\"Undeploying\
+          \ previous model: %s\", dm.id)\n            endpoint.undeploy(deployed_model_id=dm.id)\n\
+          \    else:\n        endpoint = aiplatform.Endpoint.create(\n           \
+          \ display_name=endpoint_display_name,\n            project=project_id,\n\
+          \            location=region,\n        )\n        logger.info(\"Created\
+          \ new endpoint: %s\", endpoint.resource_name)\n\n    logger.warning(\n \
+          \       \"Deploying with sklearn-cpu container. Online prediction calls\
+          \ will fail until \"\n        \"a custom serving container is built for\
+          \ MLForecast. \"\n        \"Use batch_forecast_component for production\
+          \ scoring.\"\n    )\n    model.deploy(\n        endpoint=endpoint,\n   \
+          \     deployed_model_display_name=display_name,\n        machine_type=\"\
+          n1-standard-2\",\n        traffic_percentage=100,\n        sync=True,\n\
+          \    )\n    logger.info(\"Deployment complete. Endpoint: %s\", endpoint.resource_name)\n\
+          \n    result = {\n        \"model_resource_name\": model.resource_name,\n\
+          \        \"endpoint_resource_name\": endpoint.resource_name,\n        \"\
+          champion_model_type\": model_type,\n        \"champion_model_uri\": model_uri,\n\
+          \        \"endpoint_display_name\": endpoint_display_name,\n    }\n    return\
+          \ json.dumps(result)\n\n"
+        image: python:3.11
     exec-select-champion-component:
       container:
         args:
@@ -664,6 +870,56 @@ pipelineInfo:
 root:
   dag:
     tasks:
+      batch-forecast-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-batch-forecast-component
+        dependentTasks:
+        - select-champion-component
+        inputs:
+          parameters:
+            batch_forecast_bq_table:
+              componentInputParameter: batch_forecast_bq_table
+            bq_table:
+              componentInputParameter: bq_table
+            champion_result:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: select-champion-component
+            date_features:
+              componentInputParameter: date_features
+            forecast_freq:
+              componentInputParameter: forecast_freq
+            horizon:
+              componentInputParameter: horizon
+            lags:
+              componentInputParameter: lags
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: batch-forecast
+      register-and-deploy-champion-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-register-and-deploy-champion-component
+        dependentTasks:
+        - select-champion-component
+        inputs:
+          parameters:
+            champion_result:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: select-champion-component
+            endpoint_display_name:
+              componentInputParameter: endpoint_display_name
+            project_id:
+              componentInputParameter: project_id
+            region:
+              componentInputParameter: region
+        taskInfo:
+          name: register-deploy-champion
       select-champion-component:
         cachingOptions:
           enableCache: true
@@ -781,6 +1037,8 @@ root:
           name: train-et
   inputDefinitions:
     parameters:
+      batch_forecast_bq_table:
+        parameterType: STRING
       bq_table:
         parameterType: STRING
       champion_bq_table:
@@ -795,6 +1053,10 @@ root:
         - month
         isOptional: true
         parameterType: LIST
+      endpoint_display_name:
+        defaultValue: mlforecast-champion-endpoint
+        isOptional: true
+        parameterType: STRING
       forecast_freq:
         defaultValue: D
         isOptional: true
@@ -817,6 +1079,10 @@ root:
       prediction_bq_table:
         parameterType: STRING
       project_id:
+        parameterType: STRING
+      region:
+        defaultValue: us-central1
+        isOptional: true
         parameterType: STRING
 schemaVersion: 2.1.0
 sdkVersion: kfp-2.16.0

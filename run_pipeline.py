@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from google.cloud import aiplatform
 
@@ -13,11 +14,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger("run_pipeline")
 
+# Pipeline mode: 'fanout' (dynamic models) or 'original' (3 hardcoded models)
+PIPELINE_MODE = sys.argv[1] if len(sys.argv) > 1 else "fanout"
+logger.info("Using pipeline mode: %s", PIPELINE_MODE)
+
 PARAMETER_VALUES = {
     "project_id": PROJECT_ID,
     "bq_table": "dazzling-seat-366014.forecasting.sales_daily",
     "prediction_bq_table": "dazzling-seat-366014.forecasting.sales_predictions",
     "champion_bq_table": "dazzling-seat-366014.forecasting.sales_champion",
+    "batch_forecast_bq_table": "dazzling-seat-366014.forecasting.sales_batch_forecasts",
+    "model_types": ["lgbm", "rf", "et"],  # Customizable for fan-out mode
+    "region": REGION,
+    "endpoint_display_name": "mlforecast-champion-endpoint",
     "forecast_freq": "D",
     "horizon": 2,
     "lags": [1, 2, 3],
@@ -25,6 +34,16 @@ PARAMETER_VALUES = {
     "model_display_name": "sales-mlforecast-v3",
     "champion_metric": "wmape",
 }
+
+# Choose template and display name based on mode
+if PIPELINE_MODE == "fanout":
+    TEMPLATE_PATH = "nixtla_mlforecast_fanout_pipeline.yaml"
+    DISPLAY_NAME = "nixtla-mlforecast-fanout-run"
+else:
+    TEMPLATE_PATH = "nixtla_mlforecast_parallel_pipeline.yaml"
+    DISPLAY_NAME = "nixtla-mlforecast-original-run"
+    # Remove model_types from params for original pipeline
+    PARAMETER_VALUES.pop("model_types", None)
 
 logger.info(
     "Initializing Vertex AI client (project=%s, region=%s, pipeline_root=%s)",
@@ -40,16 +59,16 @@ aiplatform.init(
 )
 
 job = aiplatform.PipelineJob(
-    display_name="nixtla-mlforecast-parallel-run",
-    template_path="nixtla_mlforecast_parallel_pipeline.yaml",
+    display_name=DISPLAY_NAME,
+    template_path=TEMPLATE_PATH,
     pipeline_root=PIPELINE_ROOT,
     parameter_values=PARAMETER_VALUES,
 )
 
 logger.info(
     "Created pipeline job (display_name=%s, template=%s)",
-    "nixtla-mlforecast-parallel-run",
-    "nixtla_mlforecast_parallel_pipeline.yaml",
+    DISPLAY_NAME,
+    TEMPLATE_PATH,
 )
 logger.info("Submitting pipeline with params: %s", PARAMETER_VALUES)
 

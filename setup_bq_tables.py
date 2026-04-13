@@ -47,6 +47,17 @@ TABLES = {
         bigquery.SchemaField("forecast_freq", "STRING", mode="NULLABLE"),
         bigquery.SchemaField("horizon", "INT64", mode="NULLABLE"),
     ],
+    "sales_batch_forecasts": [
+        bigquery.SchemaField("unique_id", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("ds", "TIMESTAMP", mode="REQUIRED"),
+        bigquery.SchemaField("prediction", "FLOAT64", mode="NULLABLE"),
+        bigquery.SchemaField("run_ts", "TIMESTAMP", mode="REQUIRED"),
+        bigquery.SchemaField("model_type", "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("source_table", "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("forecast_freq", "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("horizon", "INT64", mode="NULLABLE"),
+        bigquery.SchemaField("is_future", "BOOL", mode="NULLABLE"),
+    ],
 }
 
 
