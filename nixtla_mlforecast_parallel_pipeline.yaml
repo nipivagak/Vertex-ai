@@ -1,8 +1,10 @@
 # PIPELINE DEFINITION
 # Name: nixtla-mlforecast-parallel-pipeline
-# Description: Train multiple MLForecast models in parallel on Vertex AI Pipelines
+# Description: Train multiple MLForecast models in parallel on Vertex AI Pipelines and select champion
 # Inputs:
 #    bq_table: str
+#    champion_bq_table: str
+#    champion_metric: str [Default: 'wmape']
 #    date_features: list [Default: ['dayofweek', 'month']]
 #    forecast_freq: str [Default: 'D']
 #    horizon: int [Default: 2.0]
@@ -11,6 +13,28 @@
 #    prediction_bq_table: str
 #    project_id: str
 components:
+  comp-select-champion-component:
+    executorLabel: exec-select-champion-component
+    inputDefinitions:
+      parameters:
+        champion_bq_table:
+          parameterType: STRING
+        et_result:
+          parameterType: STRING
+        lgbm_result:
+          parameterType: STRING
+        metric_name:
+          defaultValue: wmape
+          isOptional: true
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        rf_result:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
   comp-train-single-model-component:
     executorLabel: exec-train-single-model-component
     inputDefinitions:
@@ -47,6 +71,9 @@ components:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
   comp-train-single-model-component-2:
     executorLabel: exec-train-single-model-component-2
     inputDefinitions:
@@ -83,6 +110,9 @@ components:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
   comp-train-single-model-component-3:
     executorLabel: exec-train-single-model-component-3
     inputDefinitions:
@@ -119,8 +149,76 @@ components:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
 deploymentSpec:
   executors:
+    exec-select-champion-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - select_champion_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas>=2.2.0'\
+          \ 'google-cloud-bigquery>=3.25.0' 'pyarrow>=17.0.0' 'db-dtypes>=1.2.0' \
+          \ &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef select_champion_component(\n    project_id: str,\n    champion_bq_table:\
+          \ str,\n    lgbm_result: str,\n    rf_result: str,\n    et_result: str,\n\
+          \    metric_name: str = \"wmape\",\n) -> str:\n    import json\n    import\
+          \ logging\n\n    import pandas as pd\n    from google.cloud import bigquery\n\
+          \n    logging.basicConfig(\n        level=logging.INFO,\n        format=\"\
+          %(asctime)s | %(levelname)s | %(name)s | %(message)s\",\n    )\n    logger\
+          \ = logging.getLogger(\"select_champion_component\")\n\n    results = [\n\
+          \        json.loads(lgbm_result),\n        json.loads(rf_result),\n    \
+          \    json.loads(et_result),\n    ]\n    logger.info(\"Loaded %d model results\
+          \ for champion selection\", len(results))\n\n    valid = [r for r in results\
+          \ if metric_name in r and r[metric_name] is not None]\n    if not valid:\n\
+          \        raise ValueError(f\"No valid results found for metric '{metric_name}'.\"\
+          )\n    logger.info(\"Found %d valid results using metric=%s\", len(valid),\
+          \ metric_name)\n\n    champion = min(valid, key=lambda r: r[metric_name])\n\
+          \    logger.info(\n        \"Champion selected: model_type=%s, %s=%.6f\"\
+          ,\n        champion[\"model_type\"],\n        metric_name,\n        champion[metric_name],\n\
+          \    )\n\n    champion_summary = {\n        \"champion_model_type\": champion[\"\
+          model_type\"],\n        \"champion_metric_name\": metric_name,\n       \
+          \ \"champion_metric_value\": champion[metric_name],\n        \"champion_model_uri\"\
+          : champion[\"model_uri\"],\n        \"project_id\": project_id,\n      \
+          \  \"champion_bq_table\": champion_bq_table,\n        \"run_ts\": pd.Timestamp.utcnow().isoformat(),\n\
+          \        \"all_results\": results,\n    }\n\n    champion_row = {\n    \
+          \    \"run_ts\": pd.Timestamp.utcnow(),\n        \"champion_model_type\"\
+          : champion[\"model_type\"],\n        \"champion_metric_name\": metric_name,\n\
+          \        \"champion_metric_value\": champion[metric_name],\n        \"champion_model_uri\"\
+          : champion[\"model_uri\"],\n        \"model_display_name\": champion.get(\"\
+          model_display_name\"),\n        \"source_table\": champion.get(\"source_table\"\
+          ),\n        \"prediction_bq_table\": champion.get(\"prediction_bq_table\"\
+          ),\n        \"forecast_freq\": champion.get(\"forecast_freq\"),\n      \
+          \  \"horizon\": champion.get(\"horizon\"),\n    }\n\n    client = bigquery.Client(project=project_id)\n\
+          \    champion_df = pd.DataFrame([champion_row])\n    job_config = bigquery.LoadJobConfig(write_disposition=\"\
+          WRITE_APPEND\")\n    client.load_table_from_dataframe(\n        champion_df,\n\
+          \        champion_bq_table,\n        job_config=job_config,\n    ).result()\n\
+          \    logger.info(\"Wrote champion summary to %s\", champion_bq_table)\n\n\
+          \    print(json.dumps(champion_summary, indent=2))\n    return json.dumps(champion_summary)\n\
+          \n"
+        image: python:3.11
     exec-train-single-model-component:
       container:
         args:
@@ -154,33 +252,43 @@ deploymentSpec:
           \ str,\n    prediction_bq_table: str,\n    forecast_freq: str,\n    horizon:\
           \ int,\n    lags: list[int],\n    date_features: list[str],\n    model_display_name:\
           \ str,\n    model_type: str,\n    model_artifact: Output[Model],\n    eval_metrics:\
-          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> None:\n\
-          \    import json\n    from pathlib import Path\n\n    import numpy as np\n\
-          \    import pandas as pd\n    from google.cloud import bigquery\n    from\
-          \ lightgbm import LGBMRegressor\n    from mlforecast import MLForecast\n\
-          \    from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor\n\
+          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> str:\n\
+          \    import json\n    import logging\n    from pathlib import Path\n\n \
+          \   import numpy as np\n    import pandas as pd\n    from google.cloud import\
+          \ bigquery\n    from lightgbm import LGBMRegressor\n    from mlforecast\
+          \ import MLForecast\n    from sklearn.ensemble import RandomForestRegressor,\
+          \ ExtraTreesRegressor\n\n    logging.basicConfig(\n        level=logging.INFO,\n\
+          \        format=\"%(asctime)s | %(levelname)s | %(name)s | %(message)s\"\
+          ,\n    )\n    logger = logging.getLogger(\"train_single_model_component\"\
+          )\n    logger.info(\"Starting training component for model_type=%s\", model_type)\n\
           \n    def wmape(y_true: np.ndarray, y_pred: np.ndarray) -> float:\n    \
           \    denom = np.abs(y_true).sum()\n        if denom == 0:\n            return\
           \ float(\"nan\")\n        return float(np.abs(y_true - y_pred).sum() / denom)\n\
-          \n    client = bigquery.Client(project=project_id)\n    query = f\"\"\"\n\
-          \        SELECT *\n        FROM `{bq_table}`\n        WHERE unique_id IS\
+          \n    client = bigquery.Client(project=project_id)\n    logger.info(\"Running\
+          \ BigQuery training query for table=%s\", bq_table)\n    query = f\"\"\"\
+          \n        SELECT *\n        FROM `{bq_table}`\n        WHERE unique_id IS\
           \ NOT NULL\n          AND ds IS NOT NULL\n          AND y IS NOT NULL\n\
           \        ORDER BY unique_id, ds\n    \"\"\"\n    df = client.query(query).to_dataframe()\n\
-          \n    if df.empty:\n        raise ValueError(\"No rows returned from BigQuery.\"\
-          )\n\n    required_cols = {\"unique_id\", \"ds\", \"y\"}\n    missing = required_cols\
-          \ - set(df.columns)\n    if missing:\n        raise ValueError(f\"Missing\
-          \ required columns: {sorted(missing)}\")\n\n    df[\"unique_id\"] = df[\"\
-          unique_id\"].astype(str)\n    df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n\
-          \    df[\"y\"] = pd.to_numeric(df[\"y\"], errors=\"coerce\")\n    df = df.dropna(subset=[\"\
-          unique_id\", \"ds\", \"y\"]).sort_values([\"unique_id\", \"ds\"])\n\n  \
-          \  counts = df.groupby(\"unique_id\").size()\n    df = df[df[\"unique_id\"\
-          ].isin(counts[counts > horizon].index)]\n\n    if df.empty:\n        raise\
-          \ ValueError(\"No series left after filtering short series.\")\n\n    train_parts\
-          \ = []\n    valid_parts = []\n\n    for _, g in df.groupby(\"unique_id\"\
-          , sort=False):\n        train_parts.append(g.iloc[:-horizon])\n        valid_parts.append(g.iloc[-horizon:])\n\
+          \    logger.info(\"Fetched %d rows from BigQuery\", len(df))\n\n    if df.empty:\n\
+          \        raise ValueError(\"No rows returned from BigQuery.\")\n\n    required_cols\
+          \ = {\"unique_id\", \"ds\", \"y\"}\n    missing = required_cols - set(df.columns)\n\
+          \    if missing:\n        raise ValueError(f\"Missing required columns:\
+          \ {sorted(missing)}\")\n\n    df[\"unique_id\"] = df[\"unique_id\"].astype(str)\n\
+          \    df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n    df[\"y\"] = pd.to_numeric(df[\"\
+          y\"], errors=\"coerce\")\n    df = df.dropna(subset=[\"unique_id\", \"ds\"\
+          , \"y\"]).sort_values([\"unique_id\", \"ds\"])\n    logger.info(\"Rows after\
+          \ type coercion and null filtering: %d\", len(df))\n\n    counts = df.groupby(\"\
+          unique_id\").size()\n    df = df[df[\"unique_id\"].isin(counts[counts >\
+          \ horizon].index)]\n    logger.info(\n        \"Rows after short-series\
+          \ filtering: %d (series_count=%d)\",\n        len(df),\n        df[\"unique_id\"\
+          ].nunique(),\n    )\n\n    if df.empty:\n        raise ValueError(\"No series\
+          \ left after filtering short series.\")\n\n    train_parts = []\n    valid_parts\
+          \ = []\n\n    for _, g in df.groupby(\"unique_id\", sort=False):\n     \
+          \   train_parts.append(g.iloc[:-horizon])\n        valid_parts.append(g.iloc[-horizon:])\n\
           \n    train_df = pd.concat(train_parts, ignore_index=True)\n    valid_df\
-          \ = pd.concat(valid_parts, ignore_index=True)\n\n    if model_type == \"\
-          lgbm\":\n        model = LGBMRegressor(\n            n_estimators=300,\n\
+          \ = pd.concat(valid_parts, ignore_index=True)\n    logger.info(\"Train rows=%d,\
+          \ validation rows=%d\", len(train_df), len(valid_df))\n\n    if model_type\
+          \ == \"lgbm\":\n        model = LGBMRegressor(\n            n_estimators=300,\n\
           \            learning_rate=0.05,\n            num_leaves=64,\n         \
           \   subsample=0.9,\n            colsample_bytree=0.9,\n            random_state=42,\n\
           \            verbosity=-1,\n        )\n    elif model_type == \"rf\":\n\
@@ -191,46 +299,71 @@ deploymentSpec:
           \            max_depth=10,\n            min_samples_leaf=2,\n          \
           \  n_jobs=-1,\n            random_state=42,\n        )\n    else:\n    \
           \    raise ValueError(f\"Unsupported model_type: {model_type}\")\n\n   \
-          \ allowed_date_features = [\n        \"year\",\n        \"month\",\n   \
-          \     \"week\",\n        \"day\",\n        \"dayofweek\",\n        \"dayofyear\"\
-          ,\n        \"quarter\",\n    ]\n    parsed_date_features = [x for x in date_features\
-          \ if x in allowed_date_features]\n\n    fcst = MLForecast(\n        models={model_type:\
-          \ model},\n        freq=forecast_freq,\n        lags=lags,\n        date_features=parsed_date_features,\n\
-          \        num_threads=1,\n    )\n\n    fcst.fit(\n        train_df,\n   \
-          \     id_col=\"unique_id\",\n        time_col=\"ds\",\n        target_col=\"\
-          y\",\n    )\n\n    preds = fcst.predict(h=horizon)\n\n    if model_type\
-          \ not in preds.columns:\n        raise ValueError(\n            f\"Expected\
-          \ prediction column '{model_type}'. Got columns: {preds.columns.tolist()}\"\
+          \ logger.info(\"Initialized model for model_type=%s\", model_type)\n\n \
+          \   allowed_date_features = [\n        \"year\",\n        \"month\",\n \
+          \       \"week\",\n        \"day\",\n        \"dayofweek\",\n        \"\
+          dayofyear\",\n        \"quarter\",\n    ]\n    parsed_date_features = [x\
+          \ for x in date_features if x in allowed_date_features]\n\n    fcst = MLForecast(\n\
+          \        models={model_type: model},\n        freq=forecast_freq,\n    \
+          \    lags=lags,\n        date_features=parsed_date_features,\n        num_threads=1,\n\
+          \    )\n\n    logger.info(\n        \"Fitting MLForecast with freq=%s, horizon=%d,\
+          \ lags=%s, date_features=%s\",\n        forecast_freq,\n        horizon,\n\
+          \        lags,\n        parsed_date_features,\n    )\n\n    fcst.fit(\n\
+          \        train_df,\n        id_col=\"unique_id\",\n        time_col=\"ds\"\
+          ,\n        target_col=\"y\",\n    )\n\n    preds = fcst.predict(h=horizon)\n\
+          \    logger.info(\"Generated predictions with %d rows\", len(preds))\n\n\
+          \    if model_type not in preds.columns:\n        raise ValueError(\n  \
+          \          f\"Expected prediction column '{model_type}'. Got columns: {preds.columns.tolist()}\"\
           \n        )\n\n    merged = valid_df.merge(\n        preds[[\"unique_id\"\
           , \"ds\", model_type]],\n        on=[\"unique_id\", \"ds\"],\n        how=\"\
-          inner\",\n    )\n\n    if merged.empty:\n        print(\"Validation sample:\"\
-          )\n        print(valid_df.head())\n        print(\"Prediction sample:\"\
-          )\n        print(preds.head())\n        raise ValueError(\"No overlapping\
-          \ rows between validation set and predictions.\")\n\n    y_true = merged[\"\
-          y\"].to_numpy(dtype=float)\n    y_pred = merged[model_type].to_numpy(dtype=float)\n\
-          \n    rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))\n    mae =\
-          \ float(np.mean(np.abs(y_true - y_pred)))\n    metric_wmape = wmape(y_true,\
-          \ y_pred)\n\n    eval_metrics.log_metric(\"rmse\", rmse)\n    eval_metrics.log_metric(\"\
-          mae\", mae)\n    eval_metrics.log_metric(\"wmape\", metric_wmape)\n\n  \
-          \  merged[\"run_ts\"] = pd.Timestamp.utcnow()\n    merged[\"model_display_name\"\
-          ] = model_display_name\n    merged[\"model_type\"] = model_type\n    merged[\"\
-          source_table\"] = bq_table\n    merged[\"forecast_freq\"] = forecast_freq\n\
-          \    merged[\"horizon\"] = horizon\n\n    job_config = bigquery.LoadJobConfig(write_disposition=\"\
-          WRITE_APPEND\")\n    client.load_table_from_dataframe(\n        merged,\n\
-          \        prediction_bq_table,\n        job_config=job_config,\n    ).result()\n\
-          \n    pred_path = Path(eval_predictions.path)\n    pred_path.parent.mkdir(parents=True,\
-          \ exist_ok=True)\n    merged.to_csv(pred_path, index=False)\n\n    model_dir\
-          \ = Path(model_artifact.path)\n    model_dir.mkdir(parents=True, exist_ok=True)\n\
-          \    fcst.save(model_dir)\n\n    metadata = {\n        \"model_display_name\"\
-          : model_display_name,\n        \"model_type\": model_type,\n        \"source_table\"\
-          : bq_table,\n        \"prediction_bq_table\": prediction_bq_table,\n   \
-          \     \"forecast_freq\": forecast_freq,\n        \"horizon\": horizon,\n\
-          \        \"lags\": lags,\n        \"date_features\": parsed_date_features,\n\
-          \        \"train_rows\": int(len(train_df)),\n        \"valid_rows\": int(len(valid_df)),\n\
-          \        \"series_count\": int(df[\"unique_id\"].nunique()),\n        \"\
-          rmse\": rmse,\n        \"mae\": mae,\n        \"wmape\": metric_wmape,\n\
+          inner\",\n    )\n\n    if merged.empty:\n        raise ValueError(\"No overlapping\
+          \ rows between validation set and predictions.\")\n    logger.info(\"Merged\
+          \ validation/prediction rows=%d\", len(merged))\n\n    merged = merged.rename(columns={model_type:\
+          \ \"prediction\"})\n\n    y_true = merged[\"y\"].to_numpy(dtype=float)\n\
+          \    y_pred = merged[\"prediction\"].to_numpy(dtype=float)\n\n    rmse =\
+          \ float(np.sqrt(np.mean((y_true - y_pred) ** 2)))\n    mae = float(np.mean(np.abs(y_true\
+          \ - y_pred)))\n    metric_wmape = wmape(y_true, y_pred)\n\n    eval_metrics.log_metric(\"\
+          rmse\", rmse)\n    eval_metrics.log_metric(\"mae\", mae)\n    eval_metrics.log_metric(\"\
+          wmape\", metric_wmape)\n    logger.info(\"Metrics: rmse=%.6f, mae=%.6f,\
+          \ wmape=%.6f\", rmse, mae, metric_wmape)\n\n    merged[\"run_ts\"] = pd.Timestamp.utcnow()\n\
+          \    merged[\"model_display_name\"] = model_display_name\n    merged[\"\
+          model_type\"] = model_type\n    merged[\"source_table\"] = bq_table\n  \
+          \  merged[\"forecast_freq\"] = forecast_freq\n    merged[\"horizon\"] =\
+          \ horizon\n\n    merged[\"unique_id\"] = merged[\"unique_id\"].astype(str)\n\
+          \    merged[\"y\"] = pd.to_numeric(merged[\"y\"], errors=\"coerce\")\n \
+          \   merged[\"prediction\"] = pd.to_numeric(merged[\"prediction\"], errors=\"\
+          coerce\")\n    merged[\"model_display_name\"] = merged[\"model_display_name\"\
+          ].astype(str)\n    merged[\"model_type\"] = merged[\"model_type\"].astype(str)\n\
+          \    merged[\"source_table\"] = merged[\"source_table\"].astype(str)\n \
+          \   merged[\"forecast_freq\"] = merged[\"forecast_freq\"].astype(str)\n\
+          \    merged[\"horizon\"] = merged[\"horizon\"].astype(\"int64\")\n\n   \
+          \ job_config = bigquery.LoadJobConfig(write_disposition=\"WRITE_APPEND\"\
+          )\n    client.load_table_from_dataframe(\n        merged[\n            [\n\
+          \                \"unique_id\",\n                \"ds\",\n             \
+          \   \"y\",\n                \"prediction\",\n                \"run_ts\"\
+          ,\n                \"model_display_name\",\n                \"model_type\"\
+          ,\n                \"source_table\",\n                \"forecast_freq\"\
+          ,\n                \"horizon\",\n            ]\n        ],\n        prediction_bq_table,\n\
+          \        job_config=job_config,\n    ).result()\n    logger.info(\n    \
+          \    \"Wrote %d prediction rows to %s\",\n        len(merged),\n       \
+          \ prediction_bq_table,\n    )\n\n    pred_path = Path(eval_predictions.path)\n\
+          \    pred_path.parent.mkdir(parents=True, exist_ok=True)\n    merged.to_csv(pred_path,\
+          \ index=False)\n    logger.info(\"Saved evaluation predictions artifact\
+          \ at %s\", pred_path)\n\n    model_dir = Path(model_artifact.path)\n   \
+          \ model_dir.mkdir(parents=True, exist_ok=True)\n    fcst.save(model_dir)\n\
+          \    logger.info(\"Saved model artifact at %s\", model_dir)\n\n    metadata\
+          \ = {\n        \"model_display_name\": model_display_name,\n        \"model_type\"\
+          : model_type,\n        \"source_table\": bq_table,\n        \"prediction_bq_table\"\
+          : prediction_bq_table,\n        \"forecast_freq\": forecast_freq,\n    \
+          \    \"horizon\": horizon,\n        \"lags\": lags,\n        \"date_features\"\
+          : parsed_date_features,\n        \"train_rows\": int(len(train_df)),\n \
+          \       \"valid_rows\": int(len(valid_df)),\n        \"series_count\": int(df[\"\
+          unique_id\"].nunique()),\n        \"rmse\": rmse,\n        \"mae\": mae,\n\
+          \        \"wmape\": metric_wmape,\n        \"model_uri\": model_artifact.uri,\n\
           \    }\n    with open(model_dir / \"metadata.json\", \"w\", encoding=\"\
-          utf-8\") as f:\n        json.dump(metadata, f, indent=2)\n\n"
+          utf-8\") as f:\n        json.dump(metadata, f, indent=2)\n\n    logger.info(\"\
+          Completed training component for model_type=%s\", model_type)\n\n    return\
+          \ json.dumps(metadata)\n\n"
         image: python:3.11
     exec-train-single-model-component-2:
       container:
@@ -265,33 +398,43 @@ deploymentSpec:
           \ str,\n    prediction_bq_table: str,\n    forecast_freq: str,\n    horizon:\
           \ int,\n    lags: list[int],\n    date_features: list[str],\n    model_display_name:\
           \ str,\n    model_type: str,\n    model_artifact: Output[Model],\n    eval_metrics:\
-          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> None:\n\
-          \    import json\n    from pathlib import Path\n\n    import numpy as np\n\
-          \    import pandas as pd\n    from google.cloud import bigquery\n    from\
-          \ lightgbm import LGBMRegressor\n    from mlforecast import MLForecast\n\
-          \    from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor\n\
+          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> str:\n\
+          \    import json\n    import logging\n    from pathlib import Path\n\n \
+          \   import numpy as np\n    import pandas as pd\n    from google.cloud import\
+          \ bigquery\n    from lightgbm import LGBMRegressor\n    from mlforecast\
+          \ import MLForecast\n    from sklearn.ensemble import RandomForestRegressor,\
+          \ ExtraTreesRegressor\n\n    logging.basicConfig(\n        level=logging.INFO,\n\
+          \        format=\"%(asctime)s | %(levelname)s | %(name)s | %(message)s\"\
+          ,\n    )\n    logger = logging.getLogger(\"train_single_model_component\"\
+          )\n    logger.info(\"Starting training component for model_type=%s\", model_type)\n\
           \n    def wmape(y_true: np.ndarray, y_pred: np.ndarray) -> float:\n    \
           \    denom = np.abs(y_true).sum()\n        if denom == 0:\n            return\
           \ float(\"nan\")\n        return float(np.abs(y_true - y_pred).sum() / denom)\n\
-          \n    client = bigquery.Client(project=project_id)\n    query = f\"\"\"\n\
-          \        SELECT *\n        FROM `{bq_table}`\n        WHERE unique_id IS\
+          \n    client = bigquery.Client(project=project_id)\n    logger.info(\"Running\
+          \ BigQuery training query for table=%s\", bq_table)\n    query = f\"\"\"\
+          \n        SELECT *\n        FROM `{bq_table}`\n        WHERE unique_id IS\
           \ NOT NULL\n          AND ds IS NOT NULL\n          AND y IS NOT NULL\n\
           \        ORDER BY unique_id, ds\n    \"\"\"\n    df = client.query(query).to_dataframe()\n\
-          \n    if df.empty:\n        raise ValueError(\"No rows returned from BigQuery.\"\
-          )\n\n    required_cols = {\"unique_id\", \"ds\", \"y\"}\n    missing = required_cols\
-          \ - set(df.columns)\n    if missing:\n        raise ValueError(f\"Missing\
-          \ required columns: {sorted(missing)}\")\n\n    df[\"unique_id\"] = df[\"\
-          unique_id\"].astype(str)\n    df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n\
-          \    df[\"y\"] = pd.to_numeric(df[\"y\"], errors=\"coerce\")\n    df = df.dropna(subset=[\"\
-          unique_id\", \"ds\", \"y\"]).sort_values([\"unique_id\", \"ds\"])\n\n  \
-          \  counts = df.groupby(\"unique_id\").size()\n    df = df[df[\"unique_id\"\
-          ].isin(counts[counts > horizon].index)]\n\n    if df.empty:\n        raise\
-          \ ValueError(\"No series left after filtering short series.\")\n\n    train_parts\
-          \ = []\n    valid_parts = []\n\n    for _, g in df.groupby(\"unique_id\"\
-          , sort=False):\n        train_parts.append(g.iloc[:-horizon])\n        valid_parts.append(g.iloc[-horizon:])\n\
+          \    logger.info(\"Fetched %d rows from BigQuery\", len(df))\n\n    if df.empty:\n\
+          \        raise ValueError(\"No rows returned from BigQuery.\")\n\n    required_cols\
+          \ = {\"unique_id\", \"ds\", \"y\"}\n    missing = required_cols - set(df.columns)\n\
+          \    if missing:\n        raise ValueError(f\"Missing required columns:\
+          \ {sorted(missing)}\")\n\n    df[\"unique_id\"] = df[\"unique_id\"].astype(str)\n\
+          \    df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n    df[\"y\"] = pd.to_numeric(df[\"\
+          y\"], errors=\"coerce\")\n    df = df.dropna(subset=[\"unique_id\", \"ds\"\
+          , \"y\"]).sort_values([\"unique_id\", \"ds\"])\n    logger.info(\"Rows after\
+          \ type coercion and null filtering: %d\", len(df))\n\n    counts = df.groupby(\"\
+          unique_id\").size()\n    df = df[df[\"unique_id\"].isin(counts[counts >\
+          \ horizon].index)]\n    logger.info(\n        \"Rows after short-series\
+          \ filtering: %d (series_count=%d)\",\n        len(df),\n        df[\"unique_id\"\
+          ].nunique(),\n    )\n\n    if df.empty:\n        raise ValueError(\"No series\
+          \ left after filtering short series.\")\n\n    train_parts = []\n    valid_parts\
+          \ = []\n\n    for _, g in df.groupby(\"unique_id\", sort=False):\n     \
+          \   train_parts.append(g.iloc[:-horizon])\n        valid_parts.append(g.iloc[-horizon:])\n\
           \n    train_df = pd.concat(train_parts, ignore_index=True)\n    valid_df\
-          \ = pd.concat(valid_parts, ignore_index=True)\n\n    if model_type == \"\
-          lgbm\":\n        model = LGBMRegressor(\n            n_estimators=300,\n\
+          \ = pd.concat(valid_parts, ignore_index=True)\n    logger.info(\"Train rows=%d,\
+          \ validation rows=%d\", len(train_df), len(valid_df))\n\n    if model_type\
+          \ == \"lgbm\":\n        model = LGBMRegressor(\n            n_estimators=300,\n\
           \            learning_rate=0.05,\n            num_leaves=64,\n         \
           \   subsample=0.9,\n            colsample_bytree=0.9,\n            random_state=42,\n\
           \            verbosity=-1,\n        )\n    elif model_type == \"rf\":\n\
@@ -302,46 +445,71 @@ deploymentSpec:
           \            max_depth=10,\n            min_samples_leaf=2,\n          \
           \  n_jobs=-1,\n            random_state=42,\n        )\n    else:\n    \
           \    raise ValueError(f\"Unsupported model_type: {model_type}\")\n\n   \
-          \ allowed_date_features = [\n        \"year\",\n        \"month\",\n   \
-          \     \"week\",\n        \"day\",\n        \"dayofweek\",\n        \"dayofyear\"\
-          ,\n        \"quarter\",\n    ]\n    parsed_date_features = [x for x in date_features\
-          \ if x in allowed_date_features]\n\n    fcst = MLForecast(\n        models={model_type:\
-          \ model},\n        freq=forecast_freq,\n        lags=lags,\n        date_features=parsed_date_features,\n\
-          \        num_threads=1,\n    )\n\n    fcst.fit(\n        train_df,\n   \
-          \     id_col=\"unique_id\",\n        time_col=\"ds\",\n        target_col=\"\
-          y\",\n    )\n\n    preds = fcst.predict(h=horizon)\n\n    if model_type\
-          \ not in preds.columns:\n        raise ValueError(\n            f\"Expected\
-          \ prediction column '{model_type}'. Got columns: {preds.columns.tolist()}\"\
+          \ logger.info(\"Initialized model for model_type=%s\", model_type)\n\n \
+          \   allowed_date_features = [\n        \"year\",\n        \"month\",\n \
+          \       \"week\",\n        \"day\",\n        \"dayofweek\",\n        \"\
+          dayofyear\",\n        \"quarter\",\n    ]\n    parsed_date_features = [x\
+          \ for x in date_features if x in allowed_date_features]\n\n    fcst = MLForecast(\n\
+          \        models={model_type: model},\n        freq=forecast_freq,\n    \
+          \    lags=lags,\n        date_features=parsed_date_features,\n        num_threads=1,\n\
+          \    )\n\n    logger.info(\n        \"Fitting MLForecast with freq=%s, horizon=%d,\
+          \ lags=%s, date_features=%s\",\n        forecast_freq,\n        horizon,\n\
+          \        lags,\n        parsed_date_features,\n    )\n\n    fcst.fit(\n\
+          \        train_df,\n        id_col=\"unique_id\",\n        time_col=\"ds\"\
+          ,\n        target_col=\"y\",\n    )\n\n    preds = fcst.predict(h=horizon)\n\
+          \    logger.info(\"Generated predictions with %d rows\", len(preds))\n\n\
+          \    if model_type not in preds.columns:\n        raise ValueError(\n  \
+          \          f\"Expected prediction column '{model_type}'. Got columns: {preds.columns.tolist()}\"\
           \n        )\n\n    merged = valid_df.merge(\n        preds[[\"unique_id\"\
           , \"ds\", model_type]],\n        on=[\"unique_id\", \"ds\"],\n        how=\"\
-          inner\",\n    )\n\n    if merged.empty:\n        print(\"Validation sample:\"\
-          )\n        print(valid_df.head())\n        print(\"Prediction sample:\"\
-          )\n        print(preds.head())\n        raise ValueError(\"No overlapping\
-          \ rows between validation set and predictions.\")\n\n    y_true = merged[\"\
-          y\"].to_numpy(dtype=float)\n    y_pred = merged[model_type].to_numpy(dtype=float)\n\
-          \n    rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))\n    mae =\
-          \ float(np.mean(np.abs(y_true - y_pred)))\n    metric_wmape = wmape(y_true,\
-          \ y_pred)\n\n    eval_metrics.log_metric(\"rmse\", rmse)\n    eval_metrics.log_metric(\"\
-          mae\", mae)\n    eval_metrics.log_metric(\"wmape\", metric_wmape)\n\n  \
-          \  merged[\"run_ts\"] = pd.Timestamp.utcnow()\n    merged[\"model_display_name\"\
-          ] = model_display_name\n    merged[\"model_type\"] = model_type\n    merged[\"\
-          source_table\"] = bq_table\n    merged[\"forecast_freq\"] = forecast_freq\n\
-          \    merged[\"horizon\"] = horizon\n\n    job_config = bigquery.LoadJobConfig(write_disposition=\"\
-          WRITE_APPEND\")\n    client.load_table_from_dataframe(\n        merged,\n\
-          \        prediction_bq_table,\n        job_config=job_config,\n    ).result()\n\
-          \n    pred_path = Path(eval_predictions.path)\n    pred_path.parent.mkdir(parents=True,\
-          \ exist_ok=True)\n    merged.to_csv(pred_path, index=False)\n\n    model_dir\
-          \ = Path(model_artifact.path)\n    model_dir.mkdir(parents=True, exist_ok=True)\n\
-          \    fcst.save(model_dir)\n\n    metadata = {\n        \"model_display_name\"\
-          : model_display_name,\n        \"model_type\": model_type,\n        \"source_table\"\
-          : bq_table,\n        \"prediction_bq_table\": prediction_bq_table,\n   \
-          \     \"forecast_freq\": forecast_freq,\n        \"horizon\": horizon,\n\
-          \        \"lags\": lags,\n        \"date_features\": parsed_date_features,\n\
-          \        \"train_rows\": int(len(train_df)),\n        \"valid_rows\": int(len(valid_df)),\n\
-          \        \"series_count\": int(df[\"unique_id\"].nunique()),\n        \"\
-          rmse\": rmse,\n        \"mae\": mae,\n        \"wmape\": metric_wmape,\n\
+          inner\",\n    )\n\n    if merged.empty:\n        raise ValueError(\"No overlapping\
+          \ rows between validation set and predictions.\")\n    logger.info(\"Merged\
+          \ validation/prediction rows=%d\", len(merged))\n\n    merged = merged.rename(columns={model_type:\
+          \ \"prediction\"})\n\n    y_true = merged[\"y\"].to_numpy(dtype=float)\n\
+          \    y_pred = merged[\"prediction\"].to_numpy(dtype=float)\n\n    rmse =\
+          \ float(np.sqrt(np.mean((y_true - y_pred) ** 2)))\n    mae = float(np.mean(np.abs(y_true\
+          \ - y_pred)))\n    metric_wmape = wmape(y_true, y_pred)\n\n    eval_metrics.log_metric(\"\
+          rmse\", rmse)\n    eval_metrics.log_metric(\"mae\", mae)\n    eval_metrics.log_metric(\"\
+          wmape\", metric_wmape)\n    logger.info(\"Metrics: rmse=%.6f, mae=%.6f,\
+          \ wmape=%.6f\", rmse, mae, metric_wmape)\n\n    merged[\"run_ts\"] = pd.Timestamp.utcnow()\n\
+          \    merged[\"model_display_name\"] = model_display_name\n    merged[\"\
+          model_type\"] = model_type\n    merged[\"source_table\"] = bq_table\n  \
+          \  merged[\"forecast_freq\"] = forecast_freq\n    merged[\"horizon\"] =\
+          \ horizon\n\n    merged[\"unique_id\"] = merged[\"unique_id\"].astype(str)\n\
+          \    merged[\"y\"] = pd.to_numeric(merged[\"y\"], errors=\"coerce\")\n \
+          \   merged[\"prediction\"] = pd.to_numeric(merged[\"prediction\"], errors=\"\
+          coerce\")\n    merged[\"model_display_name\"] = merged[\"model_display_name\"\
+          ].astype(str)\n    merged[\"model_type\"] = merged[\"model_type\"].astype(str)\n\
+          \    merged[\"source_table\"] = merged[\"source_table\"].astype(str)\n \
+          \   merged[\"forecast_freq\"] = merged[\"forecast_freq\"].astype(str)\n\
+          \    merged[\"horizon\"] = merged[\"horizon\"].astype(\"int64\")\n\n   \
+          \ job_config = bigquery.LoadJobConfig(write_disposition=\"WRITE_APPEND\"\
+          )\n    client.load_table_from_dataframe(\n        merged[\n            [\n\
+          \                \"unique_id\",\n                \"ds\",\n             \
+          \   \"y\",\n                \"prediction\",\n                \"run_ts\"\
+          ,\n                \"model_display_name\",\n                \"model_type\"\
+          ,\n                \"source_table\",\n                \"forecast_freq\"\
+          ,\n                \"horizon\",\n            ]\n        ],\n        prediction_bq_table,\n\
+          \        job_config=job_config,\n    ).result()\n    logger.info(\n    \
+          \    \"Wrote %d prediction rows to %s\",\n        len(merged),\n       \
+          \ prediction_bq_table,\n    )\n\n    pred_path = Path(eval_predictions.path)\n\
+          \    pred_path.parent.mkdir(parents=True, exist_ok=True)\n    merged.to_csv(pred_path,\
+          \ index=False)\n    logger.info(\"Saved evaluation predictions artifact\
+          \ at %s\", pred_path)\n\n    model_dir = Path(model_artifact.path)\n   \
+          \ model_dir.mkdir(parents=True, exist_ok=True)\n    fcst.save(model_dir)\n\
+          \    logger.info(\"Saved model artifact at %s\", model_dir)\n\n    metadata\
+          \ = {\n        \"model_display_name\": model_display_name,\n        \"model_type\"\
+          : model_type,\n        \"source_table\": bq_table,\n        \"prediction_bq_table\"\
+          : prediction_bq_table,\n        \"forecast_freq\": forecast_freq,\n    \
+          \    \"horizon\": horizon,\n        \"lags\": lags,\n        \"date_features\"\
+          : parsed_date_features,\n        \"train_rows\": int(len(train_df)),\n \
+          \       \"valid_rows\": int(len(valid_df)),\n        \"series_count\": int(df[\"\
+          unique_id\"].nunique()),\n        \"rmse\": rmse,\n        \"mae\": mae,\n\
+          \        \"wmape\": metric_wmape,\n        \"model_uri\": model_artifact.uri,\n\
           \    }\n    with open(model_dir / \"metadata.json\", \"w\", encoding=\"\
-          utf-8\") as f:\n        json.dump(metadata, f, indent=2)\n\n"
+          utf-8\") as f:\n        json.dump(metadata, f, indent=2)\n\n    logger.info(\"\
+          Completed training component for model_type=%s\", model_type)\n\n    return\
+          \ json.dumps(metadata)\n\n"
         image: python:3.11
     exec-train-single-model-component-3:
       container:
@@ -376,33 +544,43 @@ deploymentSpec:
           \ str,\n    prediction_bq_table: str,\n    forecast_freq: str,\n    horizon:\
           \ int,\n    lags: list[int],\n    date_features: list[str],\n    model_display_name:\
           \ str,\n    model_type: str,\n    model_artifact: Output[Model],\n    eval_metrics:\
-          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> None:\n\
-          \    import json\n    from pathlib import Path\n\n    import numpy as np\n\
-          \    import pandas as pd\n    from google.cloud import bigquery\n    from\
-          \ lightgbm import LGBMRegressor\n    from mlforecast import MLForecast\n\
-          \    from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor\n\
+          \ Output[Metrics],\n    eval_predictions: Output[Artifact],\n) -> str:\n\
+          \    import json\n    import logging\n    from pathlib import Path\n\n \
+          \   import numpy as np\n    import pandas as pd\n    from google.cloud import\
+          \ bigquery\n    from lightgbm import LGBMRegressor\n    from mlforecast\
+          \ import MLForecast\n    from sklearn.ensemble import RandomForestRegressor,\
+          \ ExtraTreesRegressor\n\n    logging.basicConfig(\n        level=logging.INFO,\n\
+          \        format=\"%(asctime)s | %(levelname)s | %(name)s | %(message)s\"\
+          ,\n    )\n    logger = logging.getLogger(\"train_single_model_component\"\
+          )\n    logger.info(\"Starting training component for model_type=%s\", model_type)\n\
           \n    def wmape(y_true: np.ndarray, y_pred: np.ndarray) -> float:\n    \
           \    denom = np.abs(y_true).sum()\n        if denom == 0:\n            return\
           \ float(\"nan\")\n        return float(np.abs(y_true - y_pred).sum() / denom)\n\
-          \n    client = bigquery.Client(project=project_id)\n    query = f\"\"\"\n\
-          \        SELECT *\n        FROM `{bq_table}`\n        WHERE unique_id IS\
+          \n    client = bigquery.Client(project=project_id)\n    logger.info(\"Running\
+          \ BigQuery training query for table=%s\", bq_table)\n    query = f\"\"\"\
+          \n        SELECT *\n        FROM `{bq_table}`\n        WHERE unique_id IS\
           \ NOT NULL\n          AND ds IS NOT NULL\n          AND y IS NOT NULL\n\
           \        ORDER BY unique_id, ds\n    \"\"\"\n    df = client.query(query).to_dataframe()\n\
-          \n    if df.empty:\n        raise ValueError(\"No rows returned from BigQuery.\"\
-          )\n\n    required_cols = {\"unique_id\", \"ds\", \"y\"}\n    missing = required_cols\
-          \ - set(df.columns)\n    if missing:\n        raise ValueError(f\"Missing\
-          \ required columns: {sorted(missing)}\")\n\n    df[\"unique_id\"] = df[\"\
-          unique_id\"].astype(str)\n    df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n\
-          \    df[\"y\"] = pd.to_numeric(df[\"y\"], errors=\"coerce\")\n    df = df.dropna(subset=[\"\
-          unique_id\", \"ds\", \"y\"]).sort_values([\"unique_id\", \"ds\"])\n\n  \
-          \  counts = df.groupby(\"unique_id\").size()\n    df = df[df[\"unique_id\"\
-          ].isin(counts[counts > horizon].index)]\n\n    if df.empty:\n        raise\
-          \ ValueError(\"No series left after filtering short series.\")\n\n    train_parts\
-          \ = []\n    valid_parts = []\n\n    for _, g in df.groupby(\"unique_id\"\
-          , sort=False):\n        train_parts.append(g.iloc[:-horizon])\n        valid_parts.append(g.iloc[-horizon:])\n\
+          \    logger.info(\"Fetched %d rows from BigQuery\", len(df))\n\n    if df.empty:\n\
+          \        raise ValueError(\"No rows returned from BigQuery.\")\n\n    required_cols\
+          \ = {\"unique_id\", \"ds\", \"y\"}\n    missing = required_cols - set(df.columns)\n\
+          \    if missing:\n        raise ValueError(f\"Missing required columns:\
+          \ {sorted(missing)}\")\n\n    df[\"unique_id\"] = df[\"unique_id\"].astype(str)\n\
+          \    df[\"ds\"] = pd.to_datetime(df[\"ds\"])\n    df[\"y\"] = pd.to_numeric(df[\"\
+          y\"], errors=\"coerce\")\n    df = df.dropna(subset=[\"unique_id\", \"ds\"\
+          , \"y\"]).sort_values([\"unique_id\", \"ds\"])\n    logger.info(\"Rows after\
+          \ type coercion and null filtering: %d\", len(df))\n\n    counts = df.groupby(\"\
+          unique_id\").size()\n    df = df[df[\"unique_id\"].isin(counts[counts >\
+          \ horizon].index)]\n    logger.info(\n        \"Rows after short-series\
+          \ filtering: %d (series_count=%d)\",\n        len(df),\n        df[\"unique_id\"\
+          ].nunique(),\n    )\n\n    if df.empty:\n        raise ValueError(\"No series\
+          \ left after filtering short series.\")\n\n    train_parts = []\n    valid_parts\
+          \ = []\n\n    for _, g in df.groupby(\"unique_id\", sort=False):\n     \
+          \   train_parts.append(g.iloc[:-horizon])\n        valid_parts.append(g.iloc[-horizon:])\n\
           \n    train_df = pd.concat(train_parts, ignore_index=True)\n    valid_df\
-          \ = pd.concat(valid_parts, ignore_index=True)\n\n    if model_type == \"\
-          lgbm\":\n        model = LGBMRegressor(\n            n_estimators=300,\n\
+          \ = pd.concat(valid_parts, ignore_index=True)\n    logger.info(\"Train rows=%d,\
+          \ validation rows=%d\", len(train_df), len(valid_df))\n\n    if model_type\
+          \ == \"lgbm\":\n        model = LGBMRegressor(\n            n_estimators=300,\n\
           \            learning_rate=0.05,\n            num_leaves=64,\n         \
           \   subsample=0.9,\n            colsample_bytree=0.9,\n            random_state=42,\n\
           \            verbosity=-1,\n        )\n    elif model_type == \"rf\":\n\
@@ -413,53 +591,110 @@ deploymentSpec:
           \            max_depth=10,\n            min_samples_leaf=2,\n          \
           \  n_jobs=-1,\n            random_state=42,\n        )\n    else:\n    \
           \    raise ValueError(f\"Unsupported model_type: {model_type}\")\n\n   \
-          \ allowed_date_features = [\n        \"year\",\n        \"month\",\n   \
-          \     \"week\",\n        \"day\",\n        \"dayofweek\",\n        \"dayofyear\"\
-          ,\n        \"quarter\",\n    ]\n    parsed_date_features = [x for x in date_features\
-          \ if x in allowed_date_features]\n\n    fcst = MLForecast(\n        models={model_type:\
-          \ model},\n        freq=forecast_freq,\n        lags=lags,\n        date_features=parsed_date_features,\n\
-          \        num_threads=1,\n    )\n\n    fcst.fit(\n        train_df,\n   \
-          \     id_col=\"unique_id\",\n        time_col=\"ds\",\n        target_col=\"\
-          y\",\n    )\n\n    preds = fcst.predict(h=horizon)\n\n    if model_type\
-          \ not in preds.columns:\n        raise ValueError(\n            f\"Expected\
-          \ prediction column '{model_type}'. Got columns: {preds.columns.tolist()}\"\
+          \ logger.info(\"Initialized model for model_type=%s\", model_type)\n\n \
+          \   allowed_date_features = [\n        \"year\",\n        \"month\",\n \
+          \       \"week\",\n        \"day\",\n        \"dayofweek\",\n        \"\
+          dayofyear\",\n        \"quarter\",\n    ]\n    parsed_date_features = [x\
+          \ for x in date_features if x in allowed_date_features]\n\n    fcst = MLForecast(\n\
+          \        models={model_type: model},\n        freq=forecast_freq,\n    \
+          \    lags=lags,\n        date_features=parsed_date_features,\n        num_threads=1,\n\
+          \    )\n\n    logger.info(\n        \"Fitting MLForecast with freq=%s, horizon=%d,\
+          \ lags=%s, date_features=%s\",\n        forecast_freq,\n        horizon,\n\
+          \        lags,\n        parsed_date_features,\n    )\n\n    fcst.fit(\n\
+          \        train_df,\n        id_col=\"unique_id\",\n        time_col=\"ds\"\
+          ,\n        target_col=\"y\",\n    )\n\n    preds = fcst.predict(h=horizon)\n\
+          \    logger.info(\"Generated predictions with %d rows\", len(preds))\n\n\
+          \    if model_type not in preds.columns:\n        raise ValueError(\n  \
+          \          f\"Expected prediction column '{model_type}'. Got columns: {preds.columns.tolist()}\"\
           \n        )\n\n    merged = valid_df.merge(\n        preds[[\"unique_id\"\
           , \"ds\", model_type]],\n        on=[\"unique_id\", \"ds\"],\n        how=\"\
-          inner\",\n    )\n\n    if merged.empty:\n        print(\"Validation sample:\"\
-          )\n        print(valid_df.head())\n        print(\"Prediction sample:\"\
-          )\n        print(preds.head())\n        raise ValueError(\"No overlapping\
-          \ rows between validation set and predictions.\")\n\n    y_true = merged[\"\
-          y\"].to_numpy(dtype=float)\n    y_pred = merged[model_type].to_numpy(dtype=float)\n\
-          \n    rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))\n    mae =\
-          \ float(np.mean(np.abs(y_true - y_pred)))\n    metric_wmape = wmape(y_true,\
-          \ y_pred)\n\n    eval_metrics.log_metric(\"rmse\", rmse)\n    eval_metrics.log_metric(\"\
-          mae\", mae)\n    eval_metrics.log_metric(\"wmape\", metric_wmape)\n\n  \
-          \  merged[\"run_ts\"] = pd.Timestamp.utcnow()\n    merged[\"model_display_name\"\
-          ] = model_display_name\n    merged[\"model_type\"] = model_type\n    merged[\"\
-          source_table\"] = bq_table\n    merged[\"forecast_freq\"] = forecast_freq\n\
-          \    merged[\"horizon\"] = horizon\n\n    job_config = bigquery.LoadJobConfig(write_disposition=\"\
-          WRITE_APPEND\")\n    client.load_table_from_dataframe(\n        merged,\n\
-          \        prediction_bq_table,\n        job_config=job_config,\n    ).result()\n\
-          \n    pred_path = Path(eval_predictions.path)\n    pred_path.parent.mkdir(parents=True,\
-          \ exist_ok=True)\n    merged.to_csv(pred_path, index=False)\n\n    model_dir\
-          \ = Path(model_artifact.path)\n    model_dir.mkdir(parents=True, exist_ok=True)\n\
-          \    fcst.save(model_dir)\n\n    metadata = {\n        \"model_display_name\"\
-          : model_display_name,\n        \"model_type\": model_type,\n        \"source_table\"\
-          : bq_table,\n        \"prediction_bq_table\": prediction_bq_table,\n   \
-          \     \"forecast_freq\": forecast_freq,\n        \"horizon\": horizon,\n\
-          \        \"lags\": lags,\n        \"date_features\": parsed_date_features,\n\
-          \        \"train_rows\": int(len(train_df)),\n        \"valid_rows\": int(len(valid_df)),\n\
-          \        \"series_count\": int(df[\"unique_id\"].nunique()),\n        \"\
-          rmse\": rmse,\n        \"mae\": mae,\n        \"wmape\": metric_wmape,\n\
+          inner\",\n    )\n\n    if merged.empty:\n        raise ValueError(\"No overlapping\
+          \ rows between validation set and predictions.\")\n    logger.info(\"Merged\
+          \ validation/prediction rows=%d\", len(merged))\n\n    merged = merged.rename(columns={model_type:\
+          \ \"prediction\"})\n\n    y_true = merged[\"y\"].to_numpy(dtype=float)\n\
+          \    y_pred = merged[\"prediction\"].to_numpy(dtype=float)\n\n    rmse =\
+          \ float(np.sqrt(np.mean((y_true - y_pred) ** 2)))\n    mae = float(np.mean(np.abs(y_true\
+          \ - y_pred)))\n    metric_wmape = wmape(y_true, y_pred)\n\n    eval_metrics.log_metric(\"\
+          rmse\", rmse)\n    eval_metrics.log_metric(\"mae\", mae)\n    eval_metrics.log_metric(\"\
+          wmape\", metric_wmape)\n    logger.info(\"Metrics: rmse=%.6f, mae=%.6f,\
+          \ wmape=%.6f\", rmse, mae, metric_wmape)\n\n    merged[\"run_ts\"] = pd.Timestamp.utcnow()\n\
+          \    merged[\"model_display_name\"] = model_display_name\n    merged[\"\
+          model_type\"] = model_type\n    merged[\"source_table\"] = bq_table\n  \
+          \  merged[\"forecast_freq\"] = forecast_freq\n    merged[\"horizon\"] =\
+          \ horizon\n\n    merged[\"unique_id\"] = merged[\"unique_id\"].astype(str)\n\
+          \    merged[\"y\"] = pd.to_numeric(merged[\"y\"], errors=\"coerce\")\n \
+          \   merged[\"prediction\"] = pd.to_numeric(merged[\"prediction\"], errors=\"\
+          coerce\")\n    merged[\"model_display_name\"] = merged[\"model_display_name\"\
+          ].astype(str)\n    merged[\"model_type\"] = merged[\"model_type\"].astype(str)\n\
+          \    merged[\"source_table\"] = merged[\"source_table\"].astype(str)\n \
+          \   merged[\"forecast_freq\"] = merged[\"forecast_freq\"].astype(str)\n\
+          \    merged[\"horizon\"] = merged[\"horizon\"].astype(\"int64\")\n\n   \
+          \ job_config = bigquery.LoadJobConfig(write_disposition=\"WRITE_APPEND\"\
+          )\n    client.load_table_from_dataframe(\n        merged[\n            [\n\
+          \                \"unique_id\",\n                \"ds\",\n             \
+          \   \"y\",\n                \"prediction\",\n                \"run_ts\"\
+          ,\n                \"model_display_name\",\n                \"model_type\"\
+          ,\n                \"source_table\",\n                \"forecast_freq\"\
+          ,\n                \"horizon\",\n            ]\n        ],\n        prediction_bq_table,\n\
+          \        job_config=job_config,\n    ).result()\n    logger.info(\n    \
+          \    \"Wrote %d prediction rows to %s\",\n        len(merged),\n       \
+          \ prediction_bq_table,\n    )\n\n    pred_path = Path(eval_predictions.path)\n\
+          \    pred_path.parent.mkdir(parents=True, exist_ok=True)\n    merged.to_csv(pred_path,\
+          \ index=False)\n    logger.info(\"Saved evaluation predictions artifact\
+          \ at %s\", pred_path)\n\n    model_dir = Path(model_artifact.path)\n   \
+          \ model_dir.mkdir(parents=True, exist_ok=True)\n    fcst.save(model_dir)\n\
+          \    logger.info(\"Saved model artifact at %s\", model_dir)\n\n    metadata\
+          \ = {\n        \"model_display_name\": model_display_name,\n        \"model_type\"\
+          : model_type,\n        \"source_table\": bq_table,\n        \"prediction_bq_table\"\
+          : prediction_bq_table,\n        \"forecast_freq\": forecast_freq,\n    \
+          \    \"horizon\": horizon,\n        \"lags\": lags,\n        \"date_features\"\
+          : parsed_date_features,\n        \"train_rows\": int(len(train_df)),\n \
+          \       \"valid_rows\": int(len(valid_df)),\n        \"series_count\": int(df[\"\
+          unique_id\"].nunique()),\n        \"rmse\": rmse,\n        \"mae\": mae,\n\
+          \        \"wmape\": metric_wmape,\n        \"model_uri\": model_artifact.uri,\n\
           \    }\n    with open(model_dir / \"metadata.json\", \"w\", encoding=\"\
-          utf-8\") as f:\n        json.dump(metadata, f, indent=2)\n\n"
+          utf-8\") as f:\n        json.dump(metadata, f, indent=2)\n\n    logger.info(\"\
+          Completed training component for model_type=%s\", model_type)\n\n    return\
+          \ json.dumps(metadata)\n\n"
         image: python:3.11
 pipelineInfo:
   description: Train multiple MLForecast models in parallel on Vertex AI Pipelines
+    and select champion
   name: nixtla-mlforecast-parallel-pipeline
 root:
   dag:
     tasks:
+      select-champion-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-select-champion-component
+        dependentTasks:
+        - train-single-model-component
+        - train-single-model-component-2
+        - train-single-model-component-3
+        inputs:
+          parameters:
+            champion_bq_table:
+              componentInputParameter: champion_bq_table
+            et_result:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-single-model-component-3
+            lgbm_result:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-single-model-component
+            metric_name:
+              componentInputParameter: champion_metric
+            project_id:
+              componentInputParameter: project_id
+            rf_result:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-single-model-component-2
+        taskInfo:
+          name: select-champion
       train-single-model-component:
         cachingOptions:
           enableCache: true
@@ -547,6 +782,12 @@ root:
   inputDefinitions:
     parameters:
       bq_table:
+        parameterType: STRING
+      champion_bq_table:
+        parameterType: STRING
+      champion_metric:
+        defaultValue: wmape
+        isOptional: true
         parameterType: STRING
       date_features:
         defaultValue:
