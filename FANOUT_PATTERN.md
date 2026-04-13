@@ -111,39 +111,113 @@ Edit [run_pipeline.py](run_pipeline.py#L27) and change the `model_types` list:
 ```python
 PARAMETER_VALUES = {
     ...
-    "model_types": ["lgbm", "rf", "et", "xgb", "gb", "ridge", "svr"],  # Mix and match!
+    "model_types": ["lgbm", "xgb", "arima", "ets", "croston_optimized"],  # Mix any!
     ...
 }
 ```
 
-**Available Models**:
+## Available Models: 30+ Options
 
-| Model Code | Model Name | Best For | Hyperparameters |
-|-----------|-----------|----------|-----------------|
-| `lgbm` | LightGBM | Fast gradient boosting | n_est=300, lr=0.05, leaves=64 |
-| `rf` | Random Forest | Baseline ensemble | n_est=300, depth=10 |
-| `et` | Extra Trees | Fast ensemble | n_est=300, depth=10 |
-| `xgb` | XGBoost | High-performance boosting | n_est=300, lr=0.05, depth=6 |
-| `gb` | Gradient Boosting | Stable boosting | n_est=300, lr=0.05, depth=5 |
-| `ridge` | Ridge Regression | Linear + L2 regularization | alpha=1.0 |
-| `svr` | Support Vector Regressor | Non-linear patterns | kernel=rbf, C=100 |
+### Tree-Based (6 models)
 
-**Example Combinations**:
+| Code | Model | Library | Best For |
+|------|-------|---------|----------|
+| `lgbm` | LightGBM | LightGBM | Fast gradient boosting |
+| `rf` | Random Forest | scikit-learn | Baseline ensemble |
+| `et` | Extra Trees | scikit-learn | Fast ensemble |
+| `xgb` | XGBoost | XGBoost | High-performance boosting |
+| `gb` | Gradient Boosting | scikit-learn | Stable boosting |
+| `ridge` | Ridge Regression | scikit-learn | Linear + L2 |
 
-Lightweight (fast training):
+### Support Vector & Linear (2 models)
+
+| Code | Model | Library | Best For |
+|------|-------|---------|----------|
+| `svr` | SVR | scikit-learn | Non-linear patterns |
+| `ridge` | Ridge | scikit-learn | Linear baseline |
+
+### Statistical & Forecasting (10 models)
+
+| Code | Model | Library | Best For | Notes |
+|------|-------|---------|----------|-------|
+| `arima` | AutoARIMA | statsforecast | Classical ARIMA | Auto selects (p,d,q) |
+| `ets` | AutoETS | statsforecast | Exponential Smoothing | Auto-selects components |
+| `theta` | AutoTheta | statsforecast | Theta method | Seasonal patterns |
+| `imapa` | IMAPA | statsforecast | Intermittent demand | Sparse/irregular data |
+| `adida` | ADIDA | statsforecast | Intermittent demand | Sparse/irregular data |
+| `croston` | Croston | statsforecast | Intermittent demand | Classic Croston method |
+| `croston_optimized` | Croston Optimized | statsforecast | Intermittent demand | Optimized Croston |
+| `croston_sba` | Croston SBA | statsforecast | Intermittent demand | SBA variant |
+| `mstl` | MSTL | statsforecast | Multiple seasonality | Multi-seasonal decomposition |
+
+### GARCH Models (7 models)
+
+Used for volatility modeling in time series with conditional heteroskedasticity.
+
+| Code | Model | Arch | Best For |
+|------|-------|------|----------|
+| `garch_1_1` | GARCH(1,1) | arch library | Standard volatility |
+| `garch_1_2` | GARCH(1,2) | arch library | More MA terms |
+| `garch_2_1` | GARCH(2,1) | arch library | More AR terms |
+| `garch_2_2` | GARCH(2,2) | arch library | Complex volatility |
+| `garch_3_1` | GARCH(3,1) | arch library | Extreme volatility |
+| `garch_3_2` | GARCH(3,2) | arch library | Very complex volatility |
+| `garch_3_3` | GARCH(3,3) | arch library | Maximum flexibility |
+
+### ARCH Models (2 models)
+
+Used for modeling heteroskedasticity in time series.
+
+| Code | Model | Library | Best For |
+|------|-------|---------|----------|
+| `arch_2` | ARCH(p=2) | arch library | Simple architecture |
+| `arch_3` | ARCH(p=3) | arch library | Complex architecture |
+
+---
+
+## Example Combinations
+
+### Quick Comparison (4 models)
 ```python
-"model_types": ["rf", "ridge", "lgbm"]
+"model_types": ["lgbm", "xgb", "arima", "ets"]
 ```
 
-Comprehensive comparison (all models):
+### Comprehensive Battle (12 models)
 ```python
-"model_types": ["lgbm", "rf", "et", "xgb", "gb", "ridge", "svr"]
+"model_types": ["lgbm", "rf", "xgb", "gb", "arima", "ets", "theta", "croston_optimized", "imapa", "garch_1_1", "garch_2_2", "svr"]
 ```
 
-Production (proven winners):
+### Intermittent Demand Focus
 ```python
-"model_types": ["lgbm", "xgb", "rf"]
+"model_types": ["imapa", "adida", "croston", "croston_optimized", "croston_sba"]
 ```
+
+### Multi-Seasonal Data
+```python
+"model_types": ["mstl", "arima", "ets", "theta"]
+```
+
+### Volatility Modeling
+```python
+"model_types": ["garch_1_1", "garch_2_2", "garch_3_3", "arch_2", "arch_3"]
+```
+
+### Production (Proven Winners)
+```python
+"model_types": ["lgbm", "xgb", "arima", "ets"]
+```
+
+---
+
+## Model Categories by Use Case
+
+**If your data is:**
+- **Regular/high frequency**: Use tree models or ARIMA
+- **Intermittent/sparse**: Use IMAPA, ADIDA, Croston variants
+- **Multi-seasonal**: Use MSTL, ETS with multiple seasonalities
+- **Volatile**: Use GARCH/ARCH models
+- **Linear pattern**: Use Ridge, ARIMA
+- **Non-linear**: Use XGBoost, SVR, LightGBM
 
 ---
 

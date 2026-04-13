@@ -24,7 +24,8 @@ PARAMETER_VALUES = {
     "prediction_bq_table": "dazzling-seat-366014.forecasting.sales_predictions",
     "champion_bq_table": "dazzling-seat-366014.forecasting.sales_champion",
     "batch_forecast_bq_table": "dazzling-seat-366014.forecasting.sales_batch_forecasts",
-    "model_types": ["lgbm", "rf", "et", "xgb", "gb"],  # Customizable: add/remove models here
+    # Mix and match from 30+ models! Examples below.
+    "model_types": ["lgbm", "xgb", "arima", "ets", "theta"],
     "region": REGION,
     "endpoint_display_name": "mlforecast-champion-endpoint",
     "forecast_freq": "D",

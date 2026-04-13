@@ -21,6 +21,9 @@ from kfp.dsl import Output, Model, Metrics, Artifact
         "lightgbm>=4.3.0",
         "xgboost>=2.0.0",
         "mlforecast>=0.13.0",
+        "statsmodels>=0.14.0",
+        "arch>=6.0.0",
+        "statsforecast>=1.5.0",
         "google-cloud-bigquery>=3.25.0",
         "google-cloud-storage>=2.18.0",
         "pyarrow>=17.0.0",
@@ -54,6 +57,20 @@ def train_single_model_component(
     from sklearn.linear_model import Ridge
     from sklearn.svm import SVR
     from xgboost import XGBRegressor
+    from statsmodels.tsa.arima.model import ARIMA
+    from statsmodels.tsa.exponential_smoothing.ets import ExponentialSmoothing
+    from arch import arch_model
+    from statsforecast.models import (
+        AutoARIMA,
+        AutoETS,
+        AutoTheta,
+        Croston,
+        CrostonOptimized,
+        CrostonSBA,
+        IMAPA,
+        ADIDA,
+        MSTL,
+    )
 
     logging.basicConfig(
         level=logging.INFO,
@@ -174,10 +191,51 @@ def train_single_model_component(
             C=100,
             epsilon=0.1,
         )
+    elif model_type == "imapa":
+        model = IMAPA()
+    elif model_type == "adida":
+        model = ADIDA()
+    elif model_type == "croston":
+        model = Croston()
+    elif model_type == "croston_optimized":
+        model = CrostonOptimized()
+    elif model_type == "croston_sba":
+        model = CrostonSBA()
+    elif model_type == "arima":
+        model = AutoARIMA()
+    elif model_type == "ets":
+        model = AutoETS()
+    elif model_type == "theta":
+        model = AutoTheta()
+    elif model_type == "garch_1_1":
+        model = arch_model(None, vol="Garch", p=1, q=1)
+    elif model_type == "garch_1_2":
+        model = arch_model(None, vol="Garch", p=1, q=2)
+    elif model_type == "garch_2_1":
+        model = arch_model(None, vol="Garch", p=2, q=1)
+    elif model_type == "garch_2_2":
+        model = arch_model(None, vol="Garch", p=2, q=2)
+    elif model_type == "garch_3_1":
+        model = arch_model(None, vol="Garch", p=3, q=1)
+    elif model_type == "garch_3_2":
+        model = arch_model(None, vol="Garch", p=3, q=2)
+    elif model_type == "garch_3_3":
+        model = arch_model(None, vol="Garch", p=3, q=3)
+    elif model_type == "arch_2":
+        model = arch_model(None, vol="ARCH", p=2)
+    elif model_type == "arch_3":
+        model = arch_model(None, vol="ARCH", p=3)
+    elif model_type == "mstl":
+        model = MSTL(season_length=24)  # 24 for hourly, adjust as needed
     else:
         raise ValueError(
             f"Unsupported model_type: {model_type}. "
-            "Supported: lgbm, rf, et, xgb, gb, ridge, svr"
+            "Supported (Tree): lgbm, rf, et, xgb, gb | "
+            "Supported (Linear): ridge, svr | "
+            "Supported (Statistical): imapa, adida, croston, croston_optimized, croston_sba, "
+            "arima, ets, theta, mstl | "
+            "Supported (GARCH): garch_1_1, garch_1_2, garch_2_1, garch_2_2, garch_3_1, garch_3_2, garch_3_3 | "
+            "Supported (ARCH): arch_2, arch_3"
         )
 
     logger.info("Initialized model for model_type=%s", model_type)
@@ -653,7 +711,7 @@ def mlforecast_parallel_pipeline(
     prediction_bq_table: str,
     champion_bq_table: str,
     batch_forecast_bq_table: str,
-    model_types: list[str] = ["lgbm", "rf", "et", "xgb"],
+    model_types: list[str] = ["lgbm", "rf", "et", "xgb", "arima", "ets"],
     forecast_freq: str = "D",
     horizon: int = 2,
     lags: list[int] = [1, 2, 3],
