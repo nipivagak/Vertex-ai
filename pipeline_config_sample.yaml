@@ -42,6 +42,7 @@ bq_table: "sales_daily"
 
 # Column names in your source table
 uid_col: "product_id"          # Unique identifier per time series (e.g., product, store, region)
+uid_delimiter: "_"             # Delimiter used when parsing composite unique IDs
 date_col: "date"                # Date/timestamp column
 target_col: "sales"             # Value column to forecast
 

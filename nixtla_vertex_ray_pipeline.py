@@ -38,11 +38,17 @@ def run_ray_forecast(
     metrics_table: str,
     champions_table: str,
     run_logs_table: str,
+    uid_delimiter: str = "_",
+    freq: str = "MS",
     cluster_name: str = "nixtla-forecast-ray-cluster",
     region: str = "us-central1",
     horizon: int = 12,
     season_length: int = 12,
     validation_horizon: int = 12,
+    min_history_for_full_audit: int = 24,
+    max_series: int = 0,
+    ml_lags: str = "1,12",
+    ml_audit_shards: int = 0,
     worker_node_count: int = 4,
     head_machine_type: str = "n1-standard-16",
     worker_machine_type: str = "n1-standard-16",
@@ -61,6 +67,8 @@ def run_ray_forecast(
         date_col: Date/timestamp column name
         target_col: Target value column name
         sys_id_value: System/partition identifier
+        uid_delimiter: Delimiter used in UID parsing
+        freq: Time series frequency (e.g. MS, D, W)
         output_dataset: Output BigQuery dataset
         forecast_table: Output forecast table name
         metrics_table: Output metrics table name
@@ -71,6 +79,10 @@ def run_ray_forecast(
         horizon: Forecast horizon in periods
         season_length: Seasonal period
         validation_horizon: Validation horizon
+        min_history_for_full_audit: Minimum history needed for full model audit
+        max_series: Maximum number of series to process (0 means all)
+        ml_lags: Comma-separated lags for ML models
+        ml_audit_shards: Number of shards for distributed ML audit
         worker_node_count: Number of Ray worker nodes
         head_machine_type: Machine type for head node
         worker_machine_type: Machine type for workers
@@ -124,6 +136,8 @@ python run_ray_pipeline.py \
     --date_col {date_col} \
     --target_col {target_col} \
     --sys_id_value {sys_id_value} \
+    --uid_delimiter {uid_delimiter} \
+    --freq {freq} \
     --output_dataset {output_dataset} \
     --forecast_table {forecast_table} \
     --metrics_table {metrics_table} \
@@ -132,6 +146,10 @@ python run_ray_pipeline.py \
     --horizon {horizon} \
     --season_length {season_length} \
     --validation_horizon {validation_horizon} \
+    --min_history_for_full_audit {min_history_for_full_audit} \
+    --max_series {max_series} \
+    --ml_lags {ml_lags} \
+    --ml_audit_shards {ml_audit_shards} \
     $HEAD_IMAGE_ARG \
     $WORKER_IMAGE_ARG \
     {'--delete_cluster_after_run' if delete_cluster_after_run else ''}
@@ -157,11 +175,17 @@ def nixtla_forecast_pipeline(
     metrics_table: str,
     champions_table: str,
     run_logs_table: str,
+    uid_delimiter: str = "_",
+    freq: str = "MS",
     cluster_name: str = "nixtla-forecast-ray-cluster",
     region: str = "us-central1",
     horizon: int = 12,
     season_length: int = 12,
     validation_horizon: int = 12,
+    min_history_for_full_audit: int = 24,
+    max_series: int = 0,
+    ml_lags: str = "1,12",
+    ml_audit_shards: int = 0,
     worker_node_count: int = 4,
     head_machine_type: str = "n1-standard-16",
     worker_machine_type: str = "n1-standard-16",
@@ -178,6 +202,8 @@ def nixtla_forecast_pipeline(
         date_col=date_col,
         target_col=target_col,
         sys_id_value=sys_id_value,
+        uid_delimiter=uid_delimiter,
+        freq=freq,
         output_dataset=output_dataset,
         forecast_table=forecast_table,
         metrics_table=metrics_table,
@@ -188,6 +214,10 @@ def nixtla_forecast_pipeline(
         horizon=horizon,
         season_length=season_length,
         validation_horizon=validation_horizon,
+        min_history_for_full_audit=min_history_for_full_audit,
+        max_series=max_series,
+        ml_lags=ml_lags,
+        ml_audit_shards=ml_audit_shards,
         worker_node_count=worker_node_count,
         head_machine_type=head_machine_type,
         worker_machine_type=worker_machine_type,

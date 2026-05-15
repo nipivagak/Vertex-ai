@@ -1,0 +1,363 @@
+# PIPELINE DEFINITION
+# Name: nixtla-ray-forecast-pipeline
+# Description: Nixtla MLForecast + StatsForecast on Vertex AI Ray cluster
+# Inputs:
+#    bq_dataset: str
+#    bq_table: str
+#    champions_table: str
+#    cluster_name: str [Default: 'nixtla-forecast-ray-cluster']
+#    date_col: str
+#    delete_cluster_after_run: bool [Default: False]
+#    forecast_table: str
+#    freq: str [Default: 'MS']
+#    head_custom_image: str [Default: '']
+#    head_machine_type: str [Default: 'n1-standard-16']
+#    horizon: int [Default: 12.0]
+#    max_series: int [Default: 0.0]
+#    metrics_table: str
+#    min_history_for_full_audit: int [Default: 24.0]
+#    ml_audit_shards: int [Default: 0.0]
+#    ml_lags: str [Default: '1,12']
+#    output_dataset: str
+#    project_id: str
+#    region: str [Default: 'us-central1']
+#    run_logs_table: str
+#    season_length: int [Default: 12.0]
+#    sys_id_value: str
+#    target_col: str
+#    uid_col: str
+#    uid_delimiter: str [Default: '_']
+#    validation_horizon: int [Default: 12.0]
+#    worker_custom_image: str [Default: '']
+#    worker_machine_type: str [Default: 'n1-standard-16']
+#    worker_node_count: int [Default: 4.0]
+components:
+  comp-run-ray-forecast:
+    executorLabel: exec-run-ray-forecast
+    inputDefinitions:
+      parameters:
+        bq_dataset:
+          description: Source BigQuery dataset
+          parameterType: STRING
+        bq_table:
+          description: Source BigQuery table
+          parameterType: STRING
+        champions_table:
+          description: Output champions table name
+          parameterType: STRING
+        cluster_name:
+          defaultValue: nixtla-forecast-ray-cluster
+          description: Ray cluster name (reused if exists)
+          isOptional: true
+          parameterType: STRING
+        date_col:
+          description: Date/timestamp column name
+          parameterType: STRING
+        delete_cluster_after_run:
+          defaultValue: false
+          description: Delete cluster after job completes
+          isOptional: true
+          parameterType: BOOLEAN
+        forecast_table:
+          description: Output forecast table name
+          parameterType: STRING
+        freq:
+          defaultValue: MS
+          description: Time series frequency (e.g. MS, D, W)
+          isOptional: true
+          parameterType: STRING
+        head_custom_image:
+          defaultValue: ''
+          description: Artifact Registry image URI for head node
+          isOptional: true
+          parameterType: STRING
+        head_machine_type:
+          defaultValue: n1-standard-16
+          description: Machine type for head node
+          isOptional: true
+          parameterType: STRING
+        horizon:
+          defaultValue: 12.0
+          description: Forecast horizon in periods
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        max_series:
+          defaultValue: 0.0
+          description: Maximum number of series to process (0 means all)
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        metrics_table:
+          description: Output metrics table name
+          parameterType: STRING
+        min_history_for_full_audit:
+          defaultValue: 24.0
+          description: Minimum history needed for full model audit
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        ml_audit_shards:
+          defaultValue: 0.0
+          description: Number of shards for distributed ML audit
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        ml_lags:
+          defaultValue: 1,12
+          description: Comma-separated lags for ML models
+          isOptional: true
+          parameterType: STRING
+        output_dataset:
+          description: Output BigQuery dataset
+          parameterType: STRING
+        project_id:
+          description: GCP project ID
+          parameterType: STRING
+        region:
+          defaultValue: us-central1
+          description: GCP region for Ray cluster
+          isOptional: true
+          parameterType: STRING
+        run_logs_table:
+          description: Output run logs table name
+          parameterType: STRING
+        season_length:
+          defaultValue: 12.0
+          description: Seasonal period
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        sys_id_value:
+          description: System/partition identifier
+          parameterType: STRING
+        target_col:
+          description: Target value column name
+          parameterType: STRING
+        uid_col:
+          description: Unique ID column name
+          parameterType: STRING
+        uid_delimiter:
+          defaultValue: _
+          description: Delimiter used in UID parsing
+          isOptional: true
+          parameterType: STRING
+        validation_horizon:
+          defaultValue: 12.0
+          description: Validation horizon
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        worker_custom_image:
+          defaultValue: ''
+          description: Artifact Registry image URI for worker nodes
+          isOptional: true
+          parameterType: STRING
+        worker_machine_type:
+          defaultValue: n1-standard-16
+          description: Machine type for workers
+          isOptional: true
+          parameterType: STRING
+        worker_node_count:
+          defaultValue: 4.0
+          description: Number of Ray worker nodes
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+deploymentSpec:
+  executors:
+    exec-run-ray-forecast:
+      container:
+        args:
+        - "\npip install -q     google-cloud-aiplatform     google-cloud-bigquery\
+          \     ray[client]     pandas     pyarrow     db-dtypes     statsforecast\
+          \     mlforecast     utilsforecast     lightgbm     xgboost     scikit-learn\n\
+          \nHEAD_IMAGE_ARG=\"\"\nif [ -n \"{{$.inputs.parameters['head_custom_image']}}\"\
+          \ ]; then\n    HEAD_IMAGE_ARG=\"--head_custom_image {{$.inputs.parameters['head_custom_image']}}\"\
+          \nfi\n\nWORKER_IMAGE_ARG=\"\"\nif [ -n \"{{$.inputs.parameters['worker_custom_image']}}\"\
+          \ ]; then\n    WORKER_IMAGE_ARG=\"--worker_custom_image {{$.inputs.parameters['worker_custom_image']}}\"\
+          \nfi\n\npython run_ray_pipeline.py     --project_id {{$.inputs.parameters['project_id']}}\
+          \     --region {{$.inputs.parameters['region']}}     --cluster_name {{$.inputs.parameters['cluster_name']}}\
+          \     --reuse_existing_cluster     --head_machine_type {{$.inputs.parameters['head_machine_type']}}\
+          \     --worker_machine_type {{$.inputs.parameters['worker_machine_type']}}\
+          \     --worker_node_count {{$.inputs.parameters['worker_node_count']}} \
+          \    --bq_dataset {{$.inputs.parameters['bq_dataset']}}     --bq_table {{$.inputs.parameters['bq_table']}}\
+          \     --uid_col {{$.inputs.parameters['uid_col']}}     --date_col {{$.inputs.parameters['date_col']}}\
+          \     --target_col {{$.inputs.parameters['target_col']}}     --sys_id_value\
+          \ {{$.inputs.parameters['sys_id_value']}}     --uid_delimiter {{$.inputs.parameters['uid_delimiter']}}\
+          \     --freq {{$.inputs.parameters['freq']}}     --output_dataset {{$.inputs.parameters['output_dataset']}}\
+          \     --forecast_table {{$.inputs.parameters['forecast_table']}}     --metrics_table\
+          \ {{$.inputs.parameters['metrics_table']}}     --champions_table {{$.inputs.parameters['champions_table']}}\
+          \     --run_logs_table {{$.inputs.parameters['run_logs_table']}}     --horizon\
+          \ {{$.inputs.parameters['horizon']}}     --season_length {{$.inputs.parameters['season_length']}}\
+          \     --validation_horizon {{$.inputs.parameters['validation_horizon']}}\
+          \     --min_history_for_full_audit {{$.inputs.parameters['min_history_for_full_audit']}}\
+          \     --max_series {{$.inputs.parameters['max_series']}}     --ml_lags {{$.inputs.parameters['ml_lags']}}\
+          \     --ml_audit_shards {{$.inputs.parameters['ml_audit_shards']}}     $HEAD_IMAGE_ARG\
+          \     $WORKER_IMAGE_ARG     --delete_cluster_after_run\n"
+        command:
+        - sh
+        - -c
+        image: python:3.11
+pipelineInfo:
+  description: Nixtla MLForecast + StatsForecast on Vertex AI Ray cluster
+  name: nixtla-ray-forecast-pipeline
+root:
+  dag:
+    tasks:
+      run-ray-forecast:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-run-ray-forecast
+        inputs:
+          parameters:
+            bq_dataset:
+              componentInputParameter: bq_dataset
+            bq_table:
+              componentInputParameter: bq_table
+            champions_table:
+              componentInputParameter: champions_table
+            cluster_name:
+              componentInputParameter: cluster_name
+            date_col:
+              componentInputParameter: date_col
+            delete_cluster_after_run:
+              componentInputParameter: delete_cluster_after_run
+            forecast_table:
+              componentInputParameter: forecast_table
+            freq:
+              componentInputParameter: freq
+            head_custom_image:
+              componentInputParameter: head_custom_image
+            head_machine_type:
+              componentInputParameter: head_machine_type
+            horizon:
+              componentInputParameter: horizon
+            max_series:
+              componentInputParameter: max_series
+            metrics_table:
+              componentInputParameter: metrics_table
+            min_history_for_full_audit:
+              componentInputParameter: min_history_for_full_audit
+            ml_audit_shards:
+              componentInputParameter: ml_audit_shards
+            ml_lags:
+              componentInputParameter: ml_lags
+            output_dataset:
+              componentInputParameter: output_dataset
+            project_id:
+              componentInputParameter: project_id
+            region:
+              componentInputParameter: region
+            run_logs_table:
+              componentInputParameter: run_logs_table
+            season_length:
+              componentInputParameter: season_length
+            sys_id_value:
+              componentInputParameter: sys_id_value
+            target_col:
+              componentInputParameter: target_col
+            uid_col:
+              componentInputParameter: uid_col
+            uid_delimiter:
+              componentInputParameter: uid_delimiter
+            validation_horizon:
+              componentInputParameter: validation_horizon
+            worker_custom_image:
+              componentInputParameter: worker_custom_image
+            worker_machine_type:
+              componentInputParameter: worker_machine_type
+            worker_node_count:
+              componentInputParameter: worker_node_count
+        taskInfo:
+          name: run-ray-forecast
+  inputDefinitions:
+    parameters:
+      bq_dataset:
+        parameterType: STRING
+      bq_table:
+        parameterType: STRING
+      champions_table:
+        parameterType: STRING
+      cluster_name:
+        defaultValue: nixtla-forecast-ray-cluster
+        isOptional: true
+        parameterType: STRING
+      date_col:
+        parameterType: STRING
+      delete_cluster_after_run:
+        defaultValue: false
+        isOptional: true
+        parameterType: BOOLEAN
+      forecast_table:
+        parameterType: STRING
+      freq:
+        defaultValue: MS
+        isOptional: true
+        parameterType: STRING
+      head_custom_image:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      head_machine_type:
+        defaultValue: n1-standard-16
+        isOptional: true
+        parameterType: STRING
+      horizon:
+        defaultValue: 12.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      max_series:
+        defaultValue: 0.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      metrics_table:
+        parameterType: STRING
+      min_history_for_full_audit:
+        defaultValue: 24.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      ml_audit_shards:
+        defaultValue: 0.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      ml_lags:
+        defaultValue: 1,12
+        isOptional: true
+        parameterType: STRING
+      output_dataset:
+        parameterType: STRING
+      project_id:
+        parameterType: STRING
+      region:
+        defaultValue: us-central1
+        isOptional: true
+        parameterType: STRING
+      run_logs_table:
+        parameterType: STRING
+      season_length:
+        defaultValue: 12.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      sys_id_value:
+        parameterType: STRING
+      target_col:
+        parameterType: STRING
+      uid_col:
+        parameterType: STRING
+      uid_delimiter:
+        defaultValue: _
+        isOptional: true
+        parameterType: STRING
+      validation_horizon:
+        defaultValue: 12.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      worker_custom_image:
+        defaultValue: ''
+        isOptional: true
+        parameterType: STRING
+      worker_machine_type:
+        defaultValue: n1-standard-16
+        isOptional: true
+        parameterType: STRING
+      worker_node_count:
+        defaultValue: 4.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.16.0
