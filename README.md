@@ -13,3 +13,58 @@ gcloud ai pipelines runs submit \
   --template-path=nixtla_vertex_ray_pipeline.yaml \
   --parameters=@pipeline_config.yaml
 ```
+
+## Run From Notebook (ipykernel)
+
+Use the following cells in Vertex AI Workbench/Jupyter.
+
+### Cell 1: Install dependencies in the active kernel
+
+```python
+%pip install -q google-cloud-aiplatform pyyaml kfp
+```
+
+### Cell 2: Compile the pipeline YAML
+
+```python
+!python nixtla_vertex_ray_pipeline.py --output nixtla_vertex_ray_pipeline.yaml
+```
+
+### Cell 3: Submit pipeline job with the Python SDK
+
+```python
+from google.cloud import aiplatform
+import yaml
+import time
+
+PROJECT_ID = "dazzling-seat-366014"
+REGION = "us-central1"
+
+with open("pipeline_config.yaml", "r", encoding="utf-8") as f:
+    params = yaml.safe_load(f)
+
+aiplatform.init(project=PROJECT_ID, location=REGION)
+
+job = aiplatform.PipelineJob(
+    display_name=f"my-forecast-{int(time.time())}",
+    template_path="nixtla_vertex_ray_pipeline.yaml",
+    pipeline_root="gs://dazzling-seat-366014-vertex-pipelines",
+    parameter_values=params,
+    enable_caching=False,
+)
+job.submit()
+print(job.resource_name)
+```
+
+### Cell 4: Optional wait for completion
+
+```python
+job.wait()
+print(job.state)
+```
+
+### Alternative: one command from notebook
+
+```python
+!python submit_pipeline_workbench.py
+```
