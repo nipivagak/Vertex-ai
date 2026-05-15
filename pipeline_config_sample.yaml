@@ -1,0 +1,113 @@
+# Sample Pipeline Configuration for Nixtla Ray Forecasting Pipeline
+# 
+# Usage:
+#   1. Copy this file to pipeline_config.yaml and update values
+#   2. Submit via: gcloud ai pipelines runs submit --parameters=@pipeline_config.yaml ...
+#   Or:
+#   3. Use as reference for --submit command arguments
+#
+# All fields below are examples. Update with your actual BigQuery tables and parameters.
+
+# ============================================================================
+# GCP & Cluster Configuration
+# ============================================================================
+
+project_id: "dazzling-seat-366014"
+region: "us-central1"
+cluster_name: "nixtla-forecast-ray-cluster"
+
+# Machine types: n1-standard-4, n1-standard-8, n1-standard-16, n1-standard-32, etc.
+head_machine_type: "n1-standard-16"
+worker_machine_type: "n1-standard-16"
+worker_node_count: 4
+
+# Delete cluster after job completes to avoid ongoing GCP costs
+# Set to true if you want automatic teardown; false to reuse cluster for next runs
+delete_cluster_after_run: false
+
+# ============================================================================
+# BigQuery Source Data
+# ============================================================================
+
+# Source table must have columns: uid_col, date_col, target_col
+bq_dataset: "forecasting"
+bq_table: "sales_daily"
+
+# Column names in your source table
+uid_col: "product_id"          # Unique identifier per time series (e.g., product, store, region)
+date_col: "date"                # Date/timestamp column
+target_col: "sales"             # Value column to forecast
+
+# System/partition identifier (used to filter rows; useful for multi-tenant scenarios)
+sys_id_value: "REGION_A"
+
+# ============================================================================
+# BigQuery Output Tables
+# ============================================================================
+
+# All output tables will be created in this dataset
+output_dataset: "nixtla_results"
+
+# Table names for outputs:
+forecast_table: "forecasts"             # Forecast predictions
+metrics_table: "metrics"                # Model evaluation metrics (MAE, RMSE, MAPE, etc.)
+champions_table: "champions"            # Champion model selection (best model per uid)
+run_logs_table: "run_logs"              # Pipeline execution timing and metadata
+
+# ============================================================================
+# Forecasting Parameters
+# ============================================================================
+
+# Forecast horizon: number of periods to forecast ahead
+horizon: 12
+
+# Seasonal period: e.g., 12 for monthly data (annual seasonality), 7 for daily (weekly)
+season_length: 12
+
+# Validation horizon: number of periods to hold out for evaluation
+validation_horizon: 12
+
+# Frequency: MS (month start), D (daily), W (weekly), H (hourly), etc.
+# Must match your data's temporal granularity
+freq: "MS"
+
+# ============================================================================
+# ML Audit Configuration (optional, advanced)
+# ============================================================================
+
+# ML lags for MLForecast: comma-separated list of lag periods to use as features
+# Examples: "1,12" for 1-month and 12-month lags; "1,2,3,7,14" for daily
+ml_lags: "1,12"
+
+# Number of shards for distributed ML audit (0 = auto-determine based on data size)
+ml_audit_shards: 0
+
+# Minimum history required per series for full audit (default: 24)
+min_history_for_full_audit: 24
+
+# Maximum series to process (0 = process all series)
+max_series: 0
+
+# ============================================================================
+# Example Configurations for Different Data Frequencies
+# ============================================================================
+#
+# For MONTHLY data (first day of each month):
+#   freq: "MS"
+#   season_length: 12  (annual seasonality)
+#   horizon: 12        (forecast 12 months ahead)
+#   ml_lags: "1,12"    (previous month, previous year)
+#
+# For DAILY data:
+#   freq: "D"
+#   season_length: 7   (weekly seasonality, or 365 for yearly)
+#   horizon: 30        (forecast 30 days ahead)
+#   ml_lags: "1,7,14,365"  (1 day, 1 week, 2 weeks, 1 year ago)
+#
+# For WEEKLY data:
+#   freq: "W"
+#   season_length: 52  (annual seasonality)
+#   horizon: 13        (forecast 13 weeks ahead)
+#   ml_lags: "1,4,13,52"  (1 week, 1 month, 1 quarter, 1 year)
+#
+# ============================================================================
