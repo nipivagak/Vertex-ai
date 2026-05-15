@@ -25,6 +25,13 @@ worker_node_count: 4
 # Set to true if you want automatic teardown; false to reuse cluster for next runs
 delete_cluster_after_run: false
 
+# Optional custom images from Artifact Registry for Ray head and worker nodes.
+# Leave empty ("") to use Vertex-managed default image.
+# Example format:
+#   us-central1-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:TAG
+head_custom_image: ""
+worker_custom_image: ""
+
 # ============================================================================
 # BigQuery Source Data
 # ============================================================================

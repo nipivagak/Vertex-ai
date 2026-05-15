@@ -46,6 +46,8 @@ def run_ray_forecast(
     worker_node_count: int = 4,
     head_machine_type: str = "n1-standard-16",
     worker_machine_type: str = "n1-standard-16",
+    head_custom_image: str = "",
+    worker_custom_image: str = "",
     delete_cluster_after_run: bool = False,
 ) -> dsl.ContainerSpec:
     """
@@ -72,6 +74,8 @@ def run_ray_forecast(
         worker_node_count: Number of Ray worker nodes
         head_machine_type: Machine type for head node
         worker_machine_type: Machine type for workers
+        head_custom_image: Artifact Registry image URI for head node
+        worker_custom_image: Artifact Registry image URI for worker nodes
         delete_cluster_after_run: Delete cluster after job completes
     """
     return dsl.ContainerSpec(
@@ -96,6 +100,16 @@ pip install -q \
     xgboost \
     scikit-learn
 
+HEAD_IMAGE_ARG=""
+if [ -n "{head_custom_image}" ]; then
+    HEAD_IMAGE_ARG="--head_custom_image {head_custom_image}"
+fi
+
+WORKER_IMAGE_ARG=""
+if [ -n "{worker_custom_image}" ]; then
+    WORKER_IMAGE_ARG="--worker_custom_image {worker_custom_image}"
+fi
+
 python run_ray_pipeline.py \
     --project_id {project_id} \
     --region {region} \
@@ -118,6 +132,8 @@ python run_ray_pipeline.py \
     --horizon {horizon} \
     --season_length {season_length} \
     --validation_horizon {validation_horizon} \
+    $HEAD_IMAGE_ARG \
+    $WORKER_IMAGE_ARG \
     {'--delete_cluster_after_run' if delete_cluster_after_run else ''}
 """,
         ],
@@ -149,6 +165,8 @@ def nixtla_forecast_pipeline(
     worker_node_count: int = 4,
     head_machine_type: str = "n1-standard-16",
     worker_machine_type: str = "n1-standard-16",
+    head_custom_image: str = "",
+    worker_custom_image: str = "",
     delete_cluster_after_run: bool = False,
 ):
     """Pipeline DAG for Nixtla forecasting."""
@@ -173,6 +191,8 @@ def nixtla_forecast_pipeline(
         worker_node_count=worker_node_count,
         head_machine_type=head_machine_type,
         worker_machine_type=worker_machine_type,
+        head_custom_image=head_custom_image,
+        worker_custom_image=worker_custom_image,
         delete_cluster_after_run=delete_cluster_after_run,
     )
 

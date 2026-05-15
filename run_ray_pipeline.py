@@ -40,6 +40,8 @@ def parse_args():
     )
     parser.add_argument("--head_machine_type", default="n1-standard-16")
     parser.add_argument("--worker_machine_type", default="n1-standard-16")
+    parser.add_argument("--head_custom_image", default=None)
+    parser.add_argument("--worker_custom_image", default=None)
     parser.add_argument("--worker_node_count", type=int, default=4)
     parser.add_argument("--boot_disk_size_gb", type=int, default=200)
     parser.add_argument("--ray_version", default="2.47")
@@ -86,12 +88,14 @@ def ensure_cluster(args):
         machine_type=args.head_machine_type,
         node_count=1,
         boot_disk_size_gb=args.boot_disk_size_gb,
+        custom_image=args.head_custom_image,
     )
     worker_nodes = [
         Resources(
             machine_type=args.worker_machine_type,
             node_count=args.worker_node_count,
             boot_disk_size_gb=args.boot_disk_size_gb,
+            custom_image=args.worker_custom_image,
         )
     ]
 
