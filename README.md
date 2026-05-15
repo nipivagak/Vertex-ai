@@ -1,5 +1,20 @@
 # Vertex AI Forecast Pipeline
 
+## Setup: Upload Pipeline Scripts to Cloud Storage
+
+Before submitting pipeline runs, upload the pipeline scripts to your Cloud Storage bucket:
+
+```bash
+gsutil -m cp run_ray_pipeline.py gs://dazzling-seat-366014-vertex-pipelines/nixtla-pipeline-scripts/
+gsutil -m cp ray_job/train_nixtla_ray_cluster.py gs://dazzling-seat-366014-vertex-pipelines/nixtla-pipeline-scripts/ray_job/
+```
+
+Update your `pipeline_config.yaml` to point to your GCS bucket:
+
+```yaml
+gcs_bucket: "dazzling-seat-366014-vertex-pipelines"
+```
+
 ## Submit Pipeline Run
 
 Use the following command to submit a Vertex AI Pipeline run:
