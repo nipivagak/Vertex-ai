@@ -10,6 +10,7 @@
 #    delete_cluster_after_run: bool [Default: False]
 #    forecast_table: str
 #    freq: str [Default: 'MS']
+#    gcs_bucket: str
 #    head_custom_image: str [Default: '']
 #    head_machine_type: str [Default: 'n1-standard-16']
 #    horizon: int [Default: 12.0]
@@ -65,6 +66,8 @@ components:
           defaultValue: MS
           description: Time series frequency (e.g. MS, D, W)
           isOptional: true
+          parameterType: STRING
+        gcs_bucket:
           parameterType: STRING
         head_custom_image:
           defaultValue: ''
@@ -163,10 +166,21 @@ deploymentSpec:
       container:
         args:
         - "\npip install -q     google-cloud-aiplatform     google-cloud-bigquery\
-          \     ray[client]     pandas     pyarrow     db-dtypes     statsforecast\
-          \     mlforecast     utilsforecast     lightgbm     xgboost     scikit-learn\n\
-          \nHEAD_IMAGE_ARG=\"\"\nif [ -n \"{{$.inputs.parameters['head_custom_image']}}\"\
-          \ ]; then\n    HEAD_IMAGE_ARG=\"--head_custom_image {{$.inputs.parameters['head_custom_image']}}\"\
+          \     google-cloud-storage     ray[client]     pandas     pyarrow     db-dtypes\
+          \     statsforecast     mlforecast     utilsforecast     lightgbm     xgboost\
+          \     scikit-learn\n\npython - <<'PY'\nimport pathlib\nfrom google.cloud\
+          \ import storage\n\n# Cloud Storage bucket and folder containing pipeline\
+          \ scripts\nGCS_BUCKET = \"{{$.inputs.parameters['gcs_bucket']}}\"\nGCS_PREFIX\
+          \ = \"nixtla-pipeline-scripts\"\n\nfiles = [\n    (\"run_ray_pipeline.py\"\
+          , \"run_ray_pipeline.py\"),\n    (\"ray_job/train_nixtla_ray_cluster.py\"\
+          , \"ray_job/train_nixtla_ray_cluster.py\"),\n]\n\nclient = storage.Client()\n\
+          bucket = client.bucket(GCS_BUCKET)\n\nfor src, dst in files:\n    blob_name\
+          \ = GCS_PREFIX + \"/\" + src\n    blob = bucket.blob(blob_name)\n    path\
+          \ = pathlib.Path(dst)\n    path.parent.mkdir(parents=True, exist_ok=True)\n\
+          \    blob.download_to_filename(str(path))\n    print(\"Downloaded gs://\"\
+          \ + GCS_BUCKET + \"/\" + blob_name + \" -> \" + str(path))\nPY\n\nHEAD_IMAGE_ARG=\"\
+          \"\nif [ -n \"{{$.inputs.parameters['head_custom_image']}}\" ]; then\n \
+          \   HEAD_IMAGE_ARG=\"--head_custom_image {{$.inputs.parameters['head_custom_image']}}\"\
           \nfi\n\nWORKER_IMAGE_ARG=\"\"\nif [ -n \"{{$.inputs.parameters['worker_custom_image']}}\"\
           \ ]; then\n    WORKER_IMAGE_ARG=\"--worker_custom_image {{$.inputs.parameters['worker_custom_image']}}\"\
           \nfi\n\npython run_ray_pipeline.py     --project_id {{$.inputs.parameters['project_id']}}\
@@ -221,6 +235,8 @@ root:
               componentInputParameter: forecast_table
             freq:
               componentInputParameter: freq
+            gcs_bucket:
+              componentInputParameter: gcs_bucket
             head_custom_image:
               componentInputParameter: head_custom_image
             head_machine_type:
@@ -288,6 +304,8 @@ root:
       freq:
         defaultValue: MS
         isOptional: true
+        parameterType: STRING
+      gcs_bucket:
         parameterType: STRING
       head_custom_image:
         defaultValue: ''

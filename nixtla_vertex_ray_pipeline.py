@@ -38,6 +38,7 @@ def run_ray_forecast(
     metrics_table: str,
     champions_table: str,
     run_logs_table: str,
+    gcs_bucket: str,
     uid_delimiter: str = "_",
     freq: str = "MS",
     cluster_name: str = "nixtla-forecast-ray-cluster",
@@ -101,6 +102,7 @@ def run_ray_forecast(
 pip install -q \
     google-cloud-aiplatform \
     google-cloud-bigquery \
+    google-cloud-storage \
     ray[client] \
     pandas \
     pyarrow \
@@ -111,6 +113,31 @@ pip install -q \
     lightgbm \
     xgboost \
     scikit-learn
+
+python - <<'PY'
+import pathlib
+from google.cloud import storage
+
+# Cloud Storage bucket and folder containing pipeline scripts
+GCS_BUCKET = "{gcs_bucket}"
+GCS_PREFIX = "nixtla-pipeline-scripts"
+
+files = [
+    ("run_ray_pipeline.py", "run_ray_pipeline.py"),
+    ("ray_job/train_nixtla_ray_cluster.py", "ray_job/train_nixtla_ray_cluster.py"),
+]
+
+client = storage.Client()
+bucket = client.bucket(GCS_BUCKET)
+
+for src, dst in files:
+    blob_name = GCS_PREFIX + "/" + src
+    blob = bucket.blob(blob_name)
+    path = pathlib.Path(dst)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    blob.download_to_filename(str(path))
+    print("Downloaded gs://" + GCS_BUCKET + "/" + blob_name + " -> " + str(path))
+PY
 
 HEAD_IMAGE_ARG=""
 if [ -n "{head_custom_image}" ]; then
@@ -175,6 +202,7 @@ def nixtla_forecast_pipeline(
     metrics_table: str,
     champions_table: str,
     run_logs_table: str,
+    gcs_bucket: str,
     uid_delimiter: str = "_",
     freq: str = "MS",
     cluster_name: str = "nixtla-forecast-ray-cluster",
@@ -209,6 +237,7 @@ def nixtla_forecast_pipeline(
         metrics_table=metrics_table,
         champions_table=champions_table,
         run_logs_table=run_logs_table,
+        gcs_bucket=gcs_bucket,
         cluster_name=cluster_name,
         region=region,
         horizon=horizon,
